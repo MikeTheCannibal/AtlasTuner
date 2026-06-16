@@ -74,10 +74,15 @@ final class WorkspaceModel {
 
     /// Identify and open imported BIN bytes. Identification runs off the main actor.
     func importImage(_ data: Data) async {
+        await openImage(BINImage(bytes: data))
+    }
+
+    /// Identify and open a `BINImage` (from a file or read off the vehicle) as the working project.
+    func openImage(_ image: BINImage) async {
         state = .identifying
         let catalog = self.catalog
         let opened = await Task.detached(priority: .userInitiated) {
-            CalibrationProject.open(image: BINImage(bytes: data), catalog: catalog)
+            CalibrationProject.open(image: image, catalog: catalog)
         }.value
 
         guard let opened else {
@@ -87,6 +92,29 @@ final class WorkspaceModel {
         project = opened
         state = .ready
         refreshSearch()
+    }
+
+    // MARK: Vehicle comparison
+
+    struct VehicleComparison: Sendable {
+        let matches: Bool
+        let difference: CalibrationDifference?
+    }
+
+    /// Compare the working calibration against an image read from the vehicle.
+    func compareWorking(against image: BINImage) -> VehicleComparison? {
+        guard let project else { return nil }
+        return VehicleComparison(matches: project.workingMatches(image),
+                                 difference: project.difference(against: image))
+    }
+
+    /// Keep a vehicle-read image in the revision tree for browsing/diffing.
+    @discardableResult
+    func addVehicleReference(_ image: BINImage, name: String) -> Revision? {
+        guard var project else { return nil }
+        let revision = project.addReferenceSnapshot(image, name: name)
+        self.project = project
+        return revision
     }
 
     // MARK: Tables

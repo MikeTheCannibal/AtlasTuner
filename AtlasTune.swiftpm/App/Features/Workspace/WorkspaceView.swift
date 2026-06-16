@@ -6,6 +6,7 @@ import AtlasTuneCore
 struct WorkspaceView: View {
     @State private var model = WorkspaceModel()
     @State private var showImporter = false
+    @State private var showVehicle = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     // Navigator (left column) width. The leading column of a NavigationSplitView is not
@@ -36,6 +37,7 @@ struct WorkspaceView: View {
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.data]) { result in
             handleImport(result)
         }
+        .sheet(isPresented: $showVehicle) { VehicleReadView(model: model) }
         .overlay { if model.state == .identifying { ProgressView("Identifying ROM…") } }
     }
 
@@ -108,6 +110,11 @@ struct WorkspaceView: View {
             }
             .tint(model.translationEnabled ? .accentColor : .secondary)
             .help("Auto-translate German labels to English")
+
+            Button { showVehicle = true } label: {
+                Label("Read from Vehicle", systemImage: "car.fill")
+            }
+            .help("Download the running calibration from the car and compare")
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }

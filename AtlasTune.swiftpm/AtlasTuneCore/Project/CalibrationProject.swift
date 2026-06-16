@@ -92,6 +92,28 @@ public struct CalibrationProject: Sendable {
         return DifferenceEngine(tolerance: tolerance).compare(other, workingImage, using: package)
     }
 
+    /// Difference between the working image and an arbitrary external image (e.g. a copy read off
+    /// the vehicle). `reference` is treated as the "before" so deltas read working-minus-reference.
+    public func difference(against reference: BINImage, tolerance: Double = 1e-6) -> CalibrationDifference {
+        DifferenceEngine(tolerance: tolerance).compare(reference, workingImage, using: package)
+    }
+
+    /// Exact byte-for-byte equality check (via CRC32) between the working image and `other` —
+    /// answers "is what I'm editing identical to this file?".
+    public func workingMatches(_ other: BINImage) -> Bool {
+        workingImage.size == other.size &&
+        CRC32.checksum(workingImage.bytes) == CRC32.checksum(other.bytes)
+    }
+
+    /// Capture an externally-sourced image (e.g. read from the vehicle) as a revision so it can be
+    /// browsed and compared alongside the edit history.
+    @discardableResult
+    public mutating func addReferenceSnapshot(_ image: BINImage, name: String, notes: String = "") -> Revision {
+        let revision = Revision(parentID: nil, name: name, notes: notes, image: image)
+        revisions.add(revision)
+        return revision
+    }
+
     // MARK: Search & validation
 
     public func search(_ query: String) -> [TableSearchResult] {

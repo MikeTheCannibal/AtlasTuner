@@ -62,9 +62,13 @@
       MG1 block polynomial/seed via the definition package.
 - [x] **CSV import & replay** — `CSVImporter` loads recorded logs (incl. MHD/MHD+ exports) and
       `ReplayDatalogSource` animates them; raw-data table + Share CSV in the Datalog panel.
-- [~] **Live ENET capture** — `ENETDatalogSource` (DoIP/UDS over `Network.framework`) connects,
-      routing-activates and polls data identifiers; protocol framing is tested. **Pending verified
-      S58 DIDs + on-vehicle validation** (see `Docs/Datalogging.md`).
+- [x] **Live ENET capture** — `ENETDatalogSource` (DoIP/UDS over `Network.framework`) via the
+      shared `DoIPClient`; channel map sourced from the vehicle A2L (`ENETChannelMap.s58FromA2L`).
+      Protocol framing tested. On-vehicle validation pending (variant caveat in `Docs/Datalogging.md`).
+- [~] **Read ROM from vehicle** — `VehicleROMReader` downloads a 1:1 calibration copy over
+      DoIP/UDS ReadMemoryByAddress with progress, then verify-vs-working / open / keep-as-reference
+      (`Docs/VehicleROM.md`). **Pending:** a `SecurityAccessProvider` (proprietary S58 seed/key, not
+      bundled) for protected flash, and a confirmed flash base/layout.
 
 ## Future modules (per spec)
 
