@@ -57,6 +57,22 @@ TableDefinition(
 This is the single automatic step that turns a blob of bytes into an editable calibration with the
 correct table set.
 
+## Importing definitions from an XDF
+
+`Tools/xdf_to_definition.py` converts a TunerPro/MHD+ XDF into a JSON `DefinitionPackage` matching
+the engine's Codable shape (including Swift's synthesized enum encoding for `AxisDefinition.Source`).
+The Phase 1 package `Sources/AtlasTuneCore/Resources/s58_mg1cs049.json` (1370 tables) was generated
+this way from the MHD+ XDF for the real G87 image and is loaded by `DefinitionCatalog.phase1` via
+`Bundle.module`.
+
+```bash
+python3 Tools/xdf_to_definition.py input.xdf Sources/AtlasTuneCore/Resources/s58_mg1cs049.json
+```
+
+Mapping highlights: `mmedaddress` → file offset; element size + `mmedtypeflags` (0x01 signed,
+0x10000 float) → `DataType`; MATH equation → linear `Scaling`; XDF category → one of the five
+top-level categories with the original name kept as `subcategory`.
+
 ## Adding a ROM family
 
 Adding B58/S63/etc. in a later phase is a **data** task:

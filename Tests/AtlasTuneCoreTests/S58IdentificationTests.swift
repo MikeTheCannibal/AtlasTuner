@@ -39,6 +39,18 @@ final class S58IdentificationTests: XCTestCase {
         XCTAssertEqual(match?.identity.confidence, 0.5)
     }
 
+    func testBundledPackageLoadsFullTableSet() throws {
+        // phase1 prefers the JSON package generated from the MHD+ XDF.
+        let package = try XCTUnwrap(DefinitionPackage.bundled(named: "s58_mg1cs049"))
+        XCTAssertEqual(package.id, "bmw.s58.mg1cs049.cb011")
+        XCTAssertGreaterThan(package.tables.count, 1000, "Expected the full XDF-derived table set")
+        // Categories from the spec must all be represented.
+        let cats = Set(package.tables.map(\.category))
+        XCTAssertTrue(cats.contains(.boost))
+        XCTAssertTrue(cats.contains(.fuel))
+        XCTAssertTrue(cats.contains(.ignition))
+    }
+
     func testProjectOpensRealImageWithAllTables() throws {
         let project = try XCTUnwrap(CalibrationProject.open(image: syntheticMG1CS049()))
         XCTAssertEqual(project.package.id, "bmw.s58.mg1cs049.cb011")

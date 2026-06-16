@@ -44,11 +44,20 @@
       0x7FFE51) and extracts the calibration banner at 0x29000. Covered by `S58IdentificationTests`.
       (The proprietary BIN itself is not committed — it embeds a VIN.)
 
+- [x] **Real table definitions** — 1370 tables imported from the MHD+ XDF for this exact image
+      (`F4C2L8Y8B` / CB_011) via `Tools/xdf_to_definition.py`, emitted as the bundled JSON package
+      `Sources/AtlasTuneCore/Resources/s58_mg1cs049.json` and loaded by `DefinitionCatalog.phase1`.
+      Addresses are direct file offsets; XDF MATH equations are reduced to linear factor/offset.
+      The compact programmatic `S58DefinitionPackage` remains as a fallback.
+
 ## Pending real-world reconciliation
 
-- [ ] **Verified S58 map (table value) addresses** — the table value offsets in `Definitions/S58`
-      remain structural placeholders. Reconcile against a known-good S58 map. (Data only; no code
-      change.)
+- [ ] **A2L cross-reference** — the supplied A2L is a *different* variant (`F4C2L8R6B`) using
+      TriCore virtual addresses (`0x807xxxxx`), so it was **not** merged (address base + variant
+      mismatch with this image). It can later supply canonical OEM names / `COMPU_METHOD` scaling
+      once a memory-map translation and variant match are in place.
+- [ ] **Non-linear scaling** — XDF non-linear MATH equations are currently linearly approximated
+      (none in the supplied file). Add a non-linear `ValueTransform` if a future map needs one.
 - [ ] **Real checksum scheme** — `CRC32ChecksumStrategy` is a placeholder; slot in the documented
       MG1 block polynomial/seed via the definition package.
 - [ ] **Datalog hardware source** — implement a concrete `DatalogSource` for the chosen transport

@@ -12,7 +12,16 @@ public struct DefinitionCatalog: Sendable {
     }
 
     /// The default Phase 1 catalog: S58 only.
-    public static let phase1 = DefinitionCatalog(packages: [S58DefinitionPackage.make()])
+    ///
+    /// Prefers the full definition package generated from the MHD+ XDF (1300+ tables, real
+    /// addresses), bundled as a JSON resource. Falls back to the compact programmatic package if
+    /// the resource is unavailable.
+    public static let phase1: DefinitionCatalog = {
+        if let bundled = DefinitionPackage.bundled(named: "s58_mg1cs049") {
+            return DefinitionCatalog(packages: [bundled])
+        }
+        return DefinitionCatalog(packages: [S58DefinitionPackage.make()])
+    }()
 
     /// Identify an image and return the best-matching package plus identity, if any.
     public func identify(_ image: BINImage) -> ROMIdentifier.Match? {

@@ -70,6 +70,10 @@ This repository establishes the full architecture and a working, tested engine. 
 are implemented against the engine and ready to build in Xcode. See `Docs/Roadmap.md` for what is
 complete versus pending hardware / real-map work.
 
-> ⚠️ The S58 table **addresses** in `Sources/AtlasTuneCore/Definitions/S58` are structural
-> placeholders and must be reconciled against a verified S58 map before real calibration use. The
-> data-driven design means correcting them requires no code changes.
+### Definitions
+
+The Phase 1 S58 definitions (1370 tables, real file-offset addresses) are imported from the MHD+
+XDF for this exact image via `Tools/xdf_to_definition.py` and bundled as
+`Sources/AtlasTuneCore/Resources/s58_mg1cs049.json`, loaded automatically by
+`DefinitionCatalog.phase1`. The compact `S58DefinitionPackage` remains a programmatic fallback. See
+`Docs/DefinitionEngine.md` for the conversion details.

@@ -13,7 +13,11 @@ let package = Package(
     targets: [
         .target(
             name: "AtlasTuneCore",
-            path: "Sources/AtlasTuneCore"
+            path: "Sources/AtlasTuneCore",
+            resources: [
+                // Generated from the MHD+ XDF by Tools/xdf_to_definition.py.
+                .process("Resources"),
+            ]
         ),
         .testTarget(
             name: "AtlasTuneCoreTests",
