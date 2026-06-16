@@ -64,6 +64,19 @@ open AtlasTune.xcodeproj
 Target device: 2025 iPad Pro (M5), Apple Pencil Pro. Performance goals — open under 1s, 120 FPS
 UI and surface, 100 Hz logging — are documented in `Docs/Architecture.md`.
 
+## Swift Playgrounds
+
+A ready-to-open Swift Playgrounds App project is provided at **`AtlasTune.swiftpm/`** — open it in
+Swift Playgrounds (iPad or Mac) or Xcode 15+. It bundles the engine and app as two targets plus the
+S58 JSON definitions, and runs without a developer account: SwiftData falls back from CloudKit to a
+local/in-memory store, and the Metal surface shader compiles from source at runtime.
+
+Regenerate it from the canonical sources with:
+
+```bash
+Tools/make_swiftpm.sh        # writes AtlasTune.swiftpm/ and AtlasTune.swiftpm.zip
+```
+
 ## Status
 
 This repository establishes the full architecture and a working, tested engine. UI feature views

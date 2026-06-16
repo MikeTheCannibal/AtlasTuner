@@ -17,3 +17,7 @@ Package.resolved
 *.moved-aside
 *.hmap
 *.ipa
+
+# Packaging
+build/
+*.swiftpm.zip
