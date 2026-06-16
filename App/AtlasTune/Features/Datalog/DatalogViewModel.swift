@@ -23,12 +23,14 @@ final class DatalogViewModel {
     private var source: DatalogSource?
     private var task: Task<Void, Never>?
 
-    /// Configure which table the tracker overlays and which channels drive its axes.
+    /// Configure which table the tracker overlays and which channels drive its axes. Rebuilds the
+    /// heat map over any samples already loaded, so opening a table after importing a log still
+    /// lights up where the car spent its time.
     func trackTable(_ table: CalibrationTable, x: LogChannel = .rpm, y: LogChannel = .load) {
         tracker = ActiveCellTracker(table: table)
         xChannel = x
         yChannel = y
-        heatMap = tracker?.heatMap() ?? []
+        rebuildTrackerFromSession()
     }
 
     func start(source: DatalogSource) {
@@ -53,6 +55,47 @@ final class DatalogViewModel {
         isLogging = false
     }
 
+    // MARK: Recorded logs
+
+    /// Load a recorded session statically: the raw table and full heat map populate immediately,
+    /// no streaming.
+    func loadSession(_ session: LogSession) {
+        stop()
+        self.session = session
+        latest = session.samples.last
+        rebuildTrackerFromSession()
+    }
+
+    /// Import a CSV log (round-trips with the exporter; also accepts generic logs) and load it.
+    @discardableResult
+    func importCSV(_ data: Data, name: String) -> Bool {
+        guard let session = try? CSVImporter().session(from: data, name: name) else { return false }
+        loadSession(session)
+        return true
+    }
+
+    /// Re-stream the currently loaded session through `ReplayDatalogSource` so the active cell
+    /// animates across the map at `rate` Hz.
+    func replayLoaded(rate: Double = 60) {
+        guard !session.samples.isEmpty else { return }
+        let replay = session
+        start(source: ReplayDatalogSource(session: replay, rate: rate))
+    }
+
+    /// Recompute the tracker/heat map from every sample in the current session.
+    private func rebuildTrackerFromSession() {
+        guard var tracker else { heatMap = []; return }
+        tracker.reset()
+        for sample in session.samples {
+            guard let x = sample.value(xChannel) else { continue }
+            tracker.record(x: x, y: sample.value(yChannel))
+        }
+        self.tracker = tracker
+        heatMap = tracker.heatMap()
+        activeCell = tracker.current
+        recentCells = tracker.recentCells(12)
+    }
+
     private func ingest(_ sample: LogSample) {
         session.append(sample)
         latest = sample
@@ -67,5 +110,17 @@ final class DatalogViewModel {
 
     func exportCSV() -> Data {
         CSVExporter().data(for: session)
+    }
+
+    /// Write the current session to a temporary CSV file for sharing; returns its URL.
+    func exportCSVFile() -> URL? {
+        let safeName = session.name.replacingOccurrences(of: "/", with: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName).csv")
+        do {
+            try exportCSV().write(to: url)
+            return url
+        } catch {
+            return nil
+        }
     }
 }
