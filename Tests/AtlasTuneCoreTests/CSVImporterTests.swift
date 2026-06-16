@@ -50,4 +50,34 @@ final class CSVImporterTests: XCTestCase {
     func testEmptyThrows() {
         XCTAssertThrowsError(try CSVImporter().session(from: "time,rpm"))
     }
+
+    func testMHDStyleDuplicateChannelsAndAliases() throws {
+        // Real logs repeat a concept (Boost vs Boost Target) and use varied names.
+        let csv = """
+        Time,RPM,Boost,Boost Target,Calculated Load,Ign timing avg
+        0,820,2.1,2.0,18,8
+        0.05,3500,15.2,15.0,82,11
+        """
+        let session = try CSVImporter().session(from: csv)
+        let ids = session.channels.map(\.id)
+        XCTAssertEqual(ids[0], "rpm")
+        XCTAssertEqual(ids[1], "boost")          // first Boost -> canonical
+        XCTAssertNotEqual(ids[2], "boost")       // Boost Target de-duplicated
+        XCTAssertEqual(session.channels[2].name, "Boost Target")
+        XCTAssertEqual(ids[3], "load")           // Calculated Load -> load
+        XCTAssertEqual(ids[4], "ign")            // Ign timing avg -> ignition
+        XCTAssertEqual(session.samples[1].value(.rpm), 3500)
+        XCTAssertEqual(session.samples[1].value(.load), 82)
+    }
+
+    func testClockFormattedTimeBecomesElapsedSeconds() throws {
+        let csv = """
+        Time,RPM
+        00:00:10.0,800
+        00:00:11.5,2000
+        """
+        let session = try CSVImporter().session(from: csv)
+        XCTAssertEqual(session.samples[0].time, 0, accuracy: 1e-9)      // first row is t=0
+        XCTAssertEqual(session.samples[1].time, 1.5, accuracy: 1e-9)
+    }
 }

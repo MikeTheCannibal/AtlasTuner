@@ -39,6 +39,10 @@
     <key>UIFileSharingEnabled</key>
     <true/>
 
+    <!-- Live ENET (DoIP) datalog capture connects to the vehicle gateway on the local network. -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Atlas Tune connects to your vehicle's diagnostic gateway over an ENET cable to read live datalog channels.</string>
+
     <key>UILaunchScreen</key>
     <dict/>
 </dict>

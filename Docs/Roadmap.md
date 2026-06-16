@@ -60,9 +60,11 @@
       (none in the supplied file). Add a non-linear `ValueTransform` if a future map needs one.
 - [ ] **Real checksum scheme** — `CRC32ChecksumStrategy` is a placeholder; slot in the documented
       MG1 block polynomial/seed via the definition package.
-- [ ] **Datalog hardware source** — implement a concrete `DatalogSource` for the chosen transport
-      (BLE / Wi-Fi bridge / OBD). The `ReplayDatalogSource` and `PreviewSource` already exercise the
-      pipeline.
+- [x] **CSV import & replay** — `CSVImporter` loads recorded logs (incl. MHD/MHD+ exports) and
+      `ReplayDatalogSource` animates them; raw-data table + Share CSV in the Datalog panel.
+- [~] **Live ENET capture** — `ENETDatalogSource` (DoIP/UDS over `Network.framework`) connects,
+      routing-activates and polls data identifiers; protocol framing is tested. **Pending verified
+      S58 DIDs + on-vehicle validation** (see `Docs/Datalogging.md`).
 
 ## Future modules (per spec)
 

@@ -10,6 +10,7 @@ struct DatalogView: View {
 
     @State private var showImporter = false
     @State private var showRaw = false
+    @State private var showENET = false
     @State private var shareItem: ShareItem?
 
     private struct ShareItem: Identifiable { let id = UUID(); let url: URL }
@@ -32,6 +33,9 @@ struct DatalogView: View {
             handleImport(result)
         }
         .sheet(item: $shareItem) { item in ShareSheet(items: [item.url]) }
+        .sheet(isPresented: $showENET) {
+            ENETConnectView { source in model.start(source: source) }
+        }
     }
 
     // MARK: Header & controls
@@ -44,6 +48,12 @@ struct DatalogView: View {
                 Label("Import Log", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.bordered)
+
+            Button { showENET = true } label: {
+                Label("Live (ENET)", systemImage: "cable.connector")
+            }
+            .buttonStyle(.bordered)
+            .disabled(model.isLogging)
 
             if !model.session.samples.isEmpty, !model.isLogging {
                 Button { model.replayLoaded() } label: {
