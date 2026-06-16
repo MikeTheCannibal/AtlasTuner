@@ -75,15 +75,16 @@ final class ENETDatalogSource: DatalogSource, @unchecked Sendable {
 
         let startTime = Date()
         let interval = rate > 0 ? UInt64(1_000_000_000 / rate) : 0
-        let dids = map.dids
+        let signals = map.signals
 
         while !Task.isCancelled {
-            var responses: [UInt16: [UInt8]] = [:]
-            for did in dids {
+            var responses: [UInt32: [UInt8]] = [:]
+            for signal in signals {
                 if Task.isCancelled { break }
-                guard let uds = try? await diagnosticRequest(UDS.readDataByIdentifierRequest(did), on: connection),
-                      let parsed = UDS.readDataResponse(uds) else { continue }
-                responses[parsed.did] = parsed.data
+                let request = UDS.readMemoryByAddressRequest(address: signal.address, size: signal.size)
+                guard let uds = try? await diagnosticRequest(request, on: connection),
+                      let data = UDS.readMemoryResponse(uds) else { continue }
+                responses[signal.address] = data
             }
             let time = Date().timeIntervalSince(startTime)
             yield(ENETDecoder(map: map).sample(time: time, responses: responses))

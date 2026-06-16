@@ -41,33 +41,48 @@ final class ENETFramingTests: XCTestCase {
 
     // MARK: UDS
 
-    func testReadDataResponseParsing() {
-        let response: [UInt8] = [0x62, 0xF4, 0x0C, 0x20, 0x00]   // 0x62 = 0x22 + 0x40
-        let parsed = UDS.readDataResponse(response)
-        XCTAssertEqual(parsed?.did, 0xF40C)
-        XCTAssertEqual(parsed?.data, [0x20, 0x00])
+    func testReadMemoryByAddressRequest() {
+        // 4-byte address + 1-byte size: 0x23, ALFID 0x14, addr(BE), size.
+        let req = UDS.readMemoryByAddressRequest(address: 0x500020E6, size: 2)
+        XCTAssertEqual(req, [0x23, 0x14, 0x50, 0x00, 0x20, 0xE6, 0x02])
+    }
+
+    func testReadMemoryResponseParsing() {
+        let data = UDS.readMemoryResponse([0x63, 0x58, 0x1B])   // 0x63 = 0x23 + 0x40
+        XCTAssertEqual(data, [0x58, 0x1B])
+        XCTAssertNil(UDS.readMemoryResponse([0x62, 0x00]))      // wrong service
     }
 
     func testNegativeResponse() {
-        let r = UDS.parse([0x7F, 0x22, 0x78])
-        XCTAssertEqual(r, .negative(service: 0x22, code: 0x78))
+        let r = UDS.parse([0x7F, 0x23, 0x78])
+        XCTAssertEqual(r, .negative(service: 0x23, code: 0x78))
         XCTAssertTrue(UDS.isResponsePending(r!))
     }
 
-    // MARK: Decoder
+    // MARK: Decoder (little-endian RAM reads, A2L-sourced map)
 
     func testDecoderProducesScaledSample() {
-        let map = ENETChannelMap.s58Placeholder
-        // RPM DID 0xF40C, uint16 *0.25 -> 0x2000 (8192) * 0.25 = 2048 rpm.
-        let responses: [UInt16: [UInt8]] = [0xF40C: [0x20, 0x00]]
+        let map = ENETChannelMap.s58FromA2L
+        // Epm_nEng @ 0x500020E6, int16 *0.5, little-endian. 7000 raw (0x1B58) -> 3500 rpm.
+        let responses: [UInt32: [UInt8]] = [0x500020E6: [0x58, 0x1B]]
         let sample = ENETDecoder(map: map).sample(time: 1.5, responses: responses)
         XCTAssertEqual(sample.time, 1.5)
-        XCTAssertEqual(sample.value(.rpm), 2048)
-        XCTAssertNil(sample.value(.boost)) // DID not in responses
+        XCTAssertEqual(sample.value(.rpm), 3500)
+        XCTAssertNil(sample.value(.coolant)) // address not in responses
     }
 
-    func testChannelMapDIDsUnique() {
-        let dids = ENETChannelMap.s58Placeholder.dids
-        XCTAssertEqual(dids.count, Set(dids).count)
+    func testLoadScalingMatchesA2L() {
+        // AirMod_ratChrgAirCyl factor = 3/128 = 0.0234375 (matches the A2L "q0p0234" name).
+        let map = ENETChannelMap.s58FromA2L
+        let responses: [UInt32: [UInt8]] = [0x5002493A: [0x00, 0x10]] // 0x1000 = 4096 LE
+        let sample = ENETDecoder(map: map).sample(time: 0, responses: responses)
+        XCTAssertEqual(sample.value(.load) ?? 0, 4096 * 3.0 / 128.0, accuracy: 1e-6)
+    }
+
+    func testChannelMapAddressesUnique() {
+        let addresses = ENETChannelMap.s58FromA2L.addresses
+        XCTAssertEqual(addresses.count, Set(addresses).count)
+        XCTAssertTrue(ENETChannelMap.s58FromA2L.channels.contains { $0.id == "rpm" })
+        XCTAssertTrue(ENETChannelMap.s58FromA2L.channels.contains { $0.id == "load" })
     }
 }

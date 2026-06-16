@@ -34,7 +34,7 @@ struct ENETConnectView: View {
                     Toggle("Enter extended session", isOn: $extendedSession)
                 }
                 Section {
-                    Text("Connects over a BMW ENET cable using DoIP/UDS. The device must be on the vehicle's network and allow local-network access. The S58 channel map is a placeholder pending verified data identifiers.")
+                    Text("Connects over a BMW ENET cable using DoIP + UDS ReadMemoryByAddress. Channels and scaling come from the vehicle A2L. The device must be on the vehicle's network and allow local-network access. Addresses are from software variant F4C2L8R6B — validate against your vehicle before trusting values.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

@@ -5,6 +5,7 @@ import Foundation
 public enum UDS {
     // Service IDs
     public static let readDataByIdentifier: UInt8 = 0x22
+    public static let readMemoryByAddress: UInt8 = 0x23
     public static let diagnosticSessionControl: UInt8 = 0x10
     public static let negativeResponse: UInt8 = 0x7F
 
@@ -14,6 +15,15 @@ public enum UDS {
 
     public static func readDataByIdentifierRequest(_ did: UInt16) -> [UInt8] {
         [readDataByIdentifier, UInt8(did >> 8), UInt8(did & 0xFF)]
+    }
+
+    /// ReadMemoryByAddress with a 4-byte address and 1-byte size (addressAndLengthFormatId 0x14).
+    /// This is how BMW/Bosch ECUs are live-logged: read the measurement's RAM address directly.
+    public static func readMemoryByAddressRequest(address: UInt32, size: UInt8) -> [UInt8] {
+        [readMemoryByAddress, 0x14,
+         UInt8((address >> 24) & 0xFF), UInt8((address >> 16) & 0xFF),
+         UInt8((address >> 8) & 0xFF), UInt8(address & 0xFF),
+         size]
     }
 
     public static func sessionControlRequest(_ session: UInt8) -> [UInt8] {
@@ -39,6 +49,13 @@ public enum UDS {
         guard uds.count >= 3, uds[0] == readDataByIdentifier + 0x40 else { return nil }
         let did = UInt16(uds[1]) << 8 | UInt16(uds[2])
         return (did, Array(uds.dropFirst(3)))
+    }
+
+    /// For a positive ReadMemoryByAddress response (0x63 followed by the data record), return the
+    /// data bytes. The address is not echoed, so callers correlate by request order.
+    public static func readMemoryResponse(_ uds: [UInt8]) -> [UInt8]? {
+        guard let first = uds.first, first == readMemoryByAddress + 0x40 else { return nil }
+        return Array(uds.dropFirst())
     }
 
     /// 0x78 (responsePending) is sent by the ECU to ask the tester to keep waiting.
