@@ -12,7 +12,9 @@ struct WorkspaceView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             navigator
                 .navigationTitle("Atlas Tune")
-                .navigationSplitViewColumnWidth(min: 260, ideal: 300)
+                // ~50% wider by default, and user-resizable up to a generous max so long table
+                // names can be read fully.
+                .navigationSplitViewColumnWidth(min: 320, ideal: 460, max: 640)
         } content: {
             editor
                 .navigationSplitViewColumnWidth(min: 420, ideal: 720)
@@ -65,6 +67,13 @@ struct WorkspaceView: View {
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarLeading) {
             Button { showImporter = true } label: { Label("Import", systemImage: "square.and.arrow.down") }
+            Button {
+                model.translationEnabled.toggle()
+            } label: {
+                Label("Translate German", systemImage: model.translationEnabled ? "globe.badge.chevron.backward" : "globe")
+            }
+            .tint(model.translationEnabled ? .accentColor : .secondary)
+            .help("Auto-translate German labels to English")
         }
         ToolbarItemGroup(placement: .topBarTrailing) {
             Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }

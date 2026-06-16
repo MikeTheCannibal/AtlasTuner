@@ -1,0 +1,78 @@
+import Foundation
+
+public extension GermanEnglishGlossary {
+    /// The built-in BMW/Bosch calibration glossary. Extend freely — it is plain data.
+    static let standard = GermanEnglishGlossary(
+        phrases: [
+            ("Lean Best Torque", "Lean Best Torque"),
+            ("an der", "at the"),
+            ("an den", "at the"),
+            ("für die", "for the"),
+            ("für den", "for the"),
+            ("für das", "for the"),
+            ("bei BS", "during component protection"),
+            ("Verbrennungsmotor", "combustion engine"),
+            ("Performanceanzeige", "performance display"),
+            ("Bauteilschutz", "component protection"),
+            ("Bauteilschutzlambda", "component-protection lambda"),
+            ("Fettlaufgrenze", "rich-running limit"),
+            ("Füllungseingriff", "charge intervention"),
+            ("Maximalbegrenzung", "maximum limit"),
+            ("Minimalbegrenzung", "minimum limit"),
+            ("Superklopfen", "super-knock"),
+            ("Beginnwinkel", "start angle"),
+            ("Ladedruck", "boost pressure"),
+            ("Abgastemperatur", "exhaust gas temperature"),
+            ("Saugrohrdruck", "intake manifold pressure"),
+            ("Umgebungsdruck", "ambient pressure"),
+            ("Kraftstoffdruck", "fuel pressure"),
+            ("Raildruck", "rail pressure"),
+            ("Wassertemperatur", "coolant temperature"),
+            ("Öltemperatur", "oil temperature"),
+            ("Ansauglufttemperatur", "intake air temperature"),
+            ("Zündwinkel", "ignition angle"),
+            ("Einspritzung", "injection"),
+            ("Einspritzzeit", "injection time"),
+            ("Leerlaufdrehzahl", "idle speed"),
+            ("Maximaldrehzahl", "maximum engine speed"),
+        ],
+        terms: [
+            // grammar / connectives
+            "der": "the", "die": "the", "das": "the", "des": "of the", "den": "the", "dem": "the",
+            "und": "and", "oder": "or", "bei": "at", "für": "for", "von": "of", "zur": "to the",
+            "zum": "to the", "mit": "with", "im": "in the", "in": "in", "an": "at",
+            "auf": "on", "ohne": "without", "nach": "after", "vor": "before", "über": "over",
+            "aktiv": "active", "ein": "on", "aus": "off",
+            // core ECU nouns
+            "kennfeld": "map", "kennlinie": "curve", "wert": "value", "werte": "values",
+            "faktor": "factor", "anteil": "share", "offset": "offset", "grenze": "limit",
+            "begrenzung": "limit", "schwelle": "threshold", "korrektur": "correction",
+            "anpassung": "adaptation", "regler": "controller", "regelung": "control",
+            "vorgabe": "setpoint", "sollwert": "target value", "istwert": "actual value",
+            "soll": "target", "ist": "actual", "maximal": "maximum", "minimal": "minimum",
+            "max": "max", "min": "min", "modus": "mode", "mode": "mode", "schalter": "switch",
+            // engine domains
+            "moment": "torque", "drehmoment": "torque", "drehzahl": "engine speed",
+            "last": "load", "füllung": "air charge", "fuellung": "air charge",
+            "gemisch": "mixture", "lambda": "lambda", "zündung": "ignition", "zuendung": "ignition",
+            "zündwinkel": "ignition angle", "kraftstoff": "fuel", "benzin": "petrol",
+            "einspritz": "injection", "ladung": "charge", "ladedruck": "boost",
+            "druck": "pressure", "temperatur": "temperature", "temp": "temp",
+            "abgas": "exhaust", "saugrohr": "intake manifold", "ansaug": "intake",
+            "luft": "air", "wasser": "coolant", "kühlmittel": "coolant", "öl": "oil", "oel": "oil",
+            "klopfen": "knock", "klopf": "knock", "vanos": "vanos", "nockenwelle": "camshaft",
+            "wastegate": "wastegate", "turbo": "turbo", "lader": "turbocharger",
+            "leerlauf": "idle", "warmlauf": "warm-up", "warm": "warm", "kalt": "cold",
+            "start": "start", "schub": "overrun", "volllast": "full load", "teillast": "part load",
+            // qualifiers
+            "winkel": "angle", "zeit": "time", "menge": "quantity", "verhältnis": "ratio",
+            "geschwindigkeit": "speed", "fahrzeug": "vehicle", "motor": "engine",
+            "eingriff": "intervention", "schutz": "protection", "fehler": "fault",
+            "diagnose": "diagnosis", "aktivierung": "activation", "freigabe": "enable",
+            "verzögerung": "delay", "dynamik": "dynamics", "stationär": "steady-state",
+            "präventiv": "preventive", "reduzierung": "reduction", "erhöhung": "increase",
+            "umrechnung": "conversion", "berechnung": "calculation", "filter": "filter",
+            "gradient": "gradient", "hysterese": "hysteresis", "kennung": "identifier",
+        ]
+    )
+}

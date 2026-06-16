@@ -26,10 +26,44 @@ final class WorkspaceModel {
     private(set) var searchResults: [TableSearchResult] = []
 
     let catalog: DefinitionCatalog
+    let glossary = GermanEnglishGlossary.standard
+    let knowledge = CalibrationKnowledge.shared
+
+    /// When on, German XDF labels are shown auto-translated to English. Persisted across launches.
+    var translationEnabled: Bool {
+        didSet { UserDefaults.standard.set(translationEnabled, forKey: Self.translationKey) }
+    }
+    private static let translationKey = "atlas.translateGerman"
 
     init(catalog: DefinitionCatalog = .phase1) {
         self.catalog = catalog
+        self.translationEnabled = UserDefaults.standard.bool(forKey: Self.translationKey)
     }
+
+    // MARK: Display / translation
+
+    /// Table name as shown in the UI, translated to English when translation is enabled.
+    func displayName(_ table: TableDefinition) -> String {
+        translationEnabled ? glossary.translate(table.name) : table.name
+    }
+
+    /// Section/subcategory title, translated when enabled.
+    func displaySubcategory(_ name: String) -> String {
+        translationEnabled ? glossary.translate(name) : name
+    }
+
+    /// Whether a label has German content worth offering a translation for.
+    func looksGerman(_ text: String) -> Bool { glossary.looksGerman(text) }
+
+    /// Plain-English explanation of what a table does for the S58 tune.
+    func insight(for table: TableDefinition) -> CalibrationInsight {
+        let name = translationEnabled ? glossary.translate(table.name) : table.name
+        return knowledge.insight(name: name, subcategory: table.subcategory,
+                                 category: table.category, unit: table.unit)
+    }
+
+    /// English-translated name regardless of the toggle (for the inspector "About" header).
+    func translatedName(_ table: TableDefinition) -> String { glossary.translate(table.name) }
 
     var identity: ROMIdentity? { project?.identity }
     var package: DefinitionPackage? { project?.package }
@@ -100,6 +134,19 @@ final class WorkspaceModel {
 
     func tables(in category: CalibrationCategory) -> [TableDefinition] {
         package?.tables(in: category) ?? []
+    }
+
+    /// Subcategories present within a top-level category, sorted for the collapsible navigator.
+    func subcategories(in category: CalibrationCategory) -> [String] {
+        let names = tables(in: category).map { $0.subcategory ?? "General" }
+        return Array(Set(names)).sorted()
+    }
+
+    /// Tables within a specific subcategory of a category.
+    func tables(in category: CalibrationCategory, subcategory: String) -> [TableDefinition] {
+        tables(in: category)
+            .filter { ($0.subcategory ?? "General") == subcategory }
+            .sorted { displayName($0) < displayName($1) }
     }
 
     func validate() -> ValidationReport? {

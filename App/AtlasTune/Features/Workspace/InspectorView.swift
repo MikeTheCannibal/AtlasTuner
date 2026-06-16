@@ -39,8 +39,9 @@ struct InspectorView: View {
     @ViewBuilder private var infoTab: some View {
         if let table = model.openTable {
             List {
+                TableAboutView(model: model, table: table.definition)
                 Section("Table") {
-                    labeled("Name", table.definition.name)
+                    labeled("Name", model.displayName(table.definition))
                     labeled("Category", table.definition.category.displayName)
                     labeled("Units", table.definition.unit)
                     labeled("Size", "\(table.rows) × \(table.columns)")
@@ -49,7 +50,11 @@ struct InspectorView: View {
                     }
                 }
                 if !table.definition.description.isEmpty {
-                    Section("Description") { Text(table.definition.description) }
+                    Section("Description") {
+                        Text(model.translationEnabled
+                             ? model.glossary.translate(table.definition.description)
+                             : table.definition.description)
+                    }
                 }
                 Section("Calibration") {
                     labeled("ROM", model.identity?.family ?? "—")
