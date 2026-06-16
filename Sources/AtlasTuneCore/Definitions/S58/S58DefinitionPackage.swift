@@ -1,15 +1,19 @@
 import Foundation
 
-/// Phase 1 definition package for the BMW S58 (G87 M2 / MG1CS003 family).
+/// Phase 1 definition package for the BMW S58 (G87 M2 / MG1CS049, DME 8.6.S family).
+///
+/// Identification (image size + byte signatures + version banner) is reconciled against a real
+/// G87 M2 image: an 8 MB MG1CS049 dump reporting `DME8.6.S_S58_G87` with calibration
+/// `CB_011_253.23.0_1.2.0`.
 ///
 /// Tables are laid out contiguously from `baseAddress` by a small builder so the structural
-/// addresses stay internally consistent. As stated in `S58Axes`, the absolute offsets are
-/// placeholders pending reconciliation with a verified S58 map — the point of this file is the
-/// data-driven shape of the package, not the literal byte positions.
+/// addresses stay internally consistent. As stated in `S58Axes`, the table *value* offsets are
+/// still placeholders pending reconciliation with a verified S58 map — the point of this file is
+/// the data-driven shape of the package, not the literal table byte positions.
 public enum S58DefinitionPackage {
 
-    /// Approximate calibration-region size used for size-based identification (placeholder).
-    public static let imageSize = 4 * 1024 * 1024
+    /// Full MG1CS049 image size in bytes (8 MiB), used for size-based identification gating.
+    public static let imageSize = 8 * 1024 * 1024
 
     public static func make() -> DefinitionPackage {
         var builder = TableBuilder(baseAddress: 0x10000)
@@ -97,12 +101,20 @@ public enum S58DefinitionPackage {
         ]
 
         return DefinitionPackage(
-            id: "bmw.s58.mg1cs003.phase1",
-            family: "S58 / MG1CS003",
-            calibrationVersion: "Phase 1",
+            id: "bmw.s58.mg1cs049.cb011",
+            family: "S58 / MG1CS049 (DME 8.6.S)",
+            calibrationVersion: "CB_011_253.23.0_1.2.0",
             expectedImageSizes: [imageSize],
-            versionField: nil,
-            signatures: [],
+            // Calibration banner near the start of the cal region.
+            versionField: VersionField(address: 0x29000, length: 21),
+            signatures: [
+                // DME build descriptor (integration level I35UP) at a fixed offset.
+                ROMSignature(address: 0x5FE1E, ascii: "#DME_86T0#CX#BTL#MDG1_I35UP",
+                             label: "MG1CS049 build descriptor"),
+                // Strong S58/G87 family marker in the trailing DME identification block.
+                ROMSignature(address: 0x7FFE51, ascii: "DME8.6.S_S58_G87",
+                             label: "DME 8.6.S S58 G87 marker"),
+            ],
             tables: tables
         )
     }

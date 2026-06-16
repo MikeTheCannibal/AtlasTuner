@@ -36,10 +36,19 @@
 - [x] Apple Pencil markup overlay (PencilKit)
 - [x] XcodeGen `project.yml`, Info.plist, entitlements
 
+## Reconciled against a real image
+
+- [x] **ROM identification** — verified against a real G87 M2 image: 8 MB MG1CS049 dump reporting
+      `DME8.6.S_S58_G87`, calibration `CB_011_253.23.0_1.2.0`. The package now identifies by image
+      size + two byte signatures (`#DME_86T0#CX#BTL#MDG1_I35UP` at 0x5FE1E, `DME8.6.S_S58_G87` at
+      0x7FFE51) and extracts the calibration banner at 0x29000. Covered by `S58IdentificationTests`.
+      (The proprietary BIN itself is not committed — it embeds a VIN.)
+
 ## Pending real-world reconciliation
 
-- [ ] **Verified S58 map addresses** — current addresses in `Definitions/S58` are structural
-      placeholders. Reconcile against a known-good S58 map. (Data only; no code change.)
+- [ ] **Verified S58 map (table value) addresses** — the table value offsets in `Definitions/S58`
+      remain structural placeholders. Reconcile against a known-good S58 map. (Data only; no code
+      change.)
 - [ ] **Real checksum scheme** — `CRC32ChecksumStrategy` is a placeholder; slot in the documented
       MG1 block polynomial/seed via the definition package.
 - [ ] **Datalog hardware source** — implement a concrete `DatalogSource` for the chosen transport
