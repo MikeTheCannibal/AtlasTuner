@@ -8,13 +8,23 @@ struct WorkspaceView: View {
     @State private var showImporter = false
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
+    // Navigator (left column) width. The leading column of a NavigationSplitView is not
+    // drag-resizable on iPad, so we drive its exact width ourselves and expose a drag handle.
+    @State private var sidebarWidth: CGFloat = 460
+    @GestureState private var sidebarDrag: CGFloat = 0
+    private let sidebarRange: ClosedRange<CGFloat> = 300...760
+
+    private var clampedSidebarWidth: CGFloat {
+        min(sidebarRange.upperBound, max(sidebarRange.lowerBound, sidebarWidth + sidebarDrag))
+    }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             navigator
                 .navigationTitle("Atlas Tune")
-                // ~50% wider by default, and user-resizable up to a generous max so long table
-                // names can be read fully.
-                .navigationSplitViewColumnWidth(min: 320, ideal: 460, max: 640)
+                .overlay(alignment: .trailing) { sidebarResizeHandle }
+                // Exact, user-adjustable width (drag the handle on the right edge).
+                .navigationSplitViewColumnWidth(clampedSidebarWidth)
         } content: {
             editor
                 .navigationSplitViewColumnWidth(min: 420, ideal: 720)
@@ -27,6 +37,30 @@ struct WorkspaceView: View {
             handleImport(result)
         }
         .overlay { if model.state == .identifying { ProgressView("Identifying ROM…") } }
+    }
+
+    // MARK: Sidebar resize handle
+
+    private var sidebarResizeHandle: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 16)
+            .contentShape(Rectangle())
+            .overlay {
+                Capsule()
+                    .fill(Color.secondary.opacity(sidebarDrag == 0 ? 0.25 : 0.6))
+                    .frame(width: 4, height: 48)
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .updating($sidebarDrag) { value, state, _ in state = value.translation.width }
+                    .onEnded { value in
+                        sidebarWidth = min(sidebarRange.upperBound,
+                                           max(sidebarRange.lowerBound, sidebarWidth + value.translation.width))
+                    }
+            )
+            .accessibilityLabel("Resize navigator")
+            .accessibilityHint("Drag to widen or narrow the table list")
     }
 
     // MARK: Navigator

@@ -37,11 +37,13 @@ final class DatalogViewModel {
         session = LogSession(name: "Live Session", channels: source.channels)
         isLogging = true
         let stream = source.start()
+        // This Task inherits the @MainActor context, so `ingest` and the state update below are
+        // same-actor (synchronous) calls — only the async stream iteration needs `await`.
         task = Task { [weak self] in
             for await sample in stream {
-                await self?.ingest(sample)
+                self?.ingest(sample)
             }
-            await MainActor.run { self?.isLogging = false }
+            self?.isLogging = false
         }
     }
 
