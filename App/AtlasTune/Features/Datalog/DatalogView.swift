@@ -7,6 +7,9 @@ import AtlasTuneCore
 /// spreadsheet/surface editors via the view model.
 struct DatalogView: View {
     @Bindable var model: DatalogViewModel
+    /// Applies a staged correction through the workspace's normal (undoable) edit path. `nil`
+    /// hides the Apply buttons (e.g. no table open).
+    var applyCorrection: ((SuggestedCorrection) -> Void)?
     @State private var showImporter = false
     @State private var importError: String?
 
@@ -111,10 +114,14 @@ struct DatalogView: View {
 
     @ViewBuilder private func atlasResults(_ report: AnalysisReport) -> some View {
         if report.isClean {
-            Label("No knock, lean, or boost issues found in \(report.analyzedSamples) samples.",
+            Label("No knock, mixture, or boost issues found in \(report.analyzedSamples) samples.",
                   systemImage: "checkmark.seal")
                 .font(.callout).foregroundStyle(.green)
         } else {
+            if !model.corrections.isEmpty {
+                correctionsList
+                Divider()
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(report.findings) { finding in
@@ -131,9 +138,39 @@ struct DatalogView: View {
                     }
                 }
             }
-            .frame(maxHeight: 220)
-            Text("Advisory only — Atlas AI never edits your calibration.")
+            .frame(maxHeight: 180)
+            Text("Advisory only — nothing is changed until you tap Apply, and every apply is undoable.")
                 .font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+
+    /// Quantified suggestions for the open table: small safe steps, one tap each to apply
+    /// through the normal edit path. Re-log and re-analyze after applying to keep dialling in.
+    @ViewBuilder private var correctionsList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Suggested corrections for this table").font(.caption.bold())
+            ForEach(model.corrections) { correction in
+                HStack(alignment: .center, spacing: 8) {
+                    Image(systemName: icon(correction.severity))
+                        .foregroundStyle(color(correction.severity))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(correction.summary).font(.caption)
+                        if correction.stepLimited {
+                            Text("Capped at one safe step — re-log after applying and analyze again.")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    Spacer()
+                    if let applyCorrection {
+                        Button("Apply") {
+                            applyCorrection(correction)
+                            model.markApplied(correction)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                }
+            }
         }
     }
 

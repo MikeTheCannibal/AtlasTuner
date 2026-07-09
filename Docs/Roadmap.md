@@ -86,11 +86,19 @@
 ## Future modules (per spec)
 
 - [x] **Atlas AI** — advisory analysis (`AtlasAI` → `AnalysisReport`): maps a `LogSession`'s
-      samples onto an open table's cells and flags knock, lean-under-load, and boost-vs-target
-      deviation regions, each with severity, supporting stats and a suggested (never auto-applied)
+      samples onto an open table's cells and flags knock, lean-under-load, **overly-rich**, and
+      boost-vs-target deviation regions, each with severity, supporting stats and a suggested
       action. Degrades gracefully when a log lacks a channel. Wired into the datalog panel
-      (`Analyze`). Strictly advisory — it never edits a table or image. Next: cluster adjacent
-      findings into regions, and feed knock/lean trends into a suggested-correction preview.
+      (`Analyze`). Strictly advisory — it never edits a table or image.
+- [x] **Guided corrections** — `CorrectionEngine` turns findings into quantified,
+      safety-clamped `SuggestedCorrection`s for the open table only when its category matches
+      (knock→ignition, mixture→fuel, boost→boost). Each pass corrects a damped fraction of the
+      measured error (gain 0.5) under hard per-pass caps (1.0° timing / 3% fuel / 1.0 psi boost),
+      detects lambda-target vs quantity fuel tables to get the enrich direction right, and flags
+      `stepLimited` when the log asked for more than one safe step (re-log and iterate — the
+      loop converges on data). Applying is always an explicit tap, routed through the normal
+      `EditEngine` path: undoable, revisioned, clamped to the table's safe `valueRange`.
+      Next: cluster adjacent findings into one region-level suggestion.
 - [ ] Surface comparison mode (stock vs modified) and colour-coded difference surface — the diff
       data already exists via `DifferenceEngine`; needs a second mesh + shader path.
 - [ ] Multi-log overlay and per-region time-spent analytics.

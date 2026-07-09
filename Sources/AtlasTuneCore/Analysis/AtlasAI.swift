@@ -10,8 +10,11 @@ public struct AtlasAI: Sendable {
         public var knockRetardDegrees: Double
         /// Lambda at or above which a sample counts as lean (higher lambda = leaner).
         public var maxLambda: Double
-        /// Only judge lambda as lean when engine load (the y channel) is at least this — lean
-        /// cruise is normal; lean under load is the danger.
+        /// Lambda at or below which a sample counts as overly rich — safe, but costs power,
+        /// economy and washes cylinders. Judged under the same load gate as lean.
+        public var richLambda: Double
+        /// Only judge lambda when engine load (the y channel) is at least this — lean
+        /// cruise is normal; mixture only matters under load.
         public var leanMinLoad: Double
         /// Absolute boost error (psi) at or above which actual-vs-target counts as a deviation.
         public var boostDeviationPsi: Double
@@ -24,12 +27,14 @@ public struct AtlasAI: Sendable {
         public init(
             knockRetardDegrees: Double = 1.0,
             maxLambda: Double = 0.90,
+            richLambda: Double = 0.72,
             leanMinLoad: Double = 70,
             boostDeviationPsi: Double = 2.0,
             minSamplesPerCell: Int = 1
         ) {
             self.knockRetardDegrees = knockRetardDegrees
             self.maxLambda = maxLambda
+            self.richLambda = richLambda
             self.leanMinLoad = leanMinLoad
             self.boostDeviationPsi = boostDeviationPsi
             self.minSamplesPerCell = minSamplesPerCell
@@ -72,9 +77,12 @@ public struct AtlasAI: Sendable {
                     accumulators[Accumulator(cell, .knock), default: Bucket()].add(magnitude)
                 }
             }
-            if let lambda = sample.value(.lambda), let load = loadValue,
-               load >= thresholds.leanMinLoad, lambda >= thresholds.maxLambda {
-                accumulators[Accumulator(cell, .lean), default: Bucket()].add(lambda)
+            if let lambda = sample.value(.lambda), let load = loadValue, load >= thresholds.leanMinLoad {
+                if lambda >= thresholds.maxLambda {
+                    accumulators[Accumulator(cell, .lean), default: Bucket()].add(lambda)
+                } else if lambda <= thresholds.richLambda {
+                    accumulators[Accumulator(cell, .rich), default: Bucket()].add(lambda)
+                }
             }
             if let targetID = boostTarget, let actual = sample.value(.boost),
                let target = sample.value(channelID: targetID) {
@@ -106,20 +114,32 @@ public struct AtlasAI: Sendable {
         let severity: AtlasSeverity
         let message: String
         let suggestion: String
+        let worst: Double
 
         switch category {
         case .knock:
+            worst = peakMagnitude
             severity = Self.severity(value: peakMagnitude, threshold: thresholds.knockRetardDegrees)
             message = String(format: "Knock retard up to %.1f° (avg %.1f°) across %d samples.",
                              peakMagnitude, abs(mean), bucket.count)
             suggestion = "Consider pulling ignition timing in this region, or verify fuel quality."
         case .lean:
             // Lambda sits near 1, so absolute exceedance is more meaningful than a ratio.
-            severity = Self.leanSeverity(peakLambda: peakMagnitude, maxLambda: thresholds.maxLambda)
+            worst = bucket.peakHigh
+            severity = Self.leanSeverity(peakLambda: bucket.peakHigh, maxLambda: thresholds.maxLambda)
             message = String(format: "Lambda reached %.2f (avg %.2f), leaner than %.2f, under load.",
-                             peakMagnitude, mean, thresholds.maxLambda)
+                             bucket.peakHigh, mean, thresholds.maxLambda)
             suggestion = "Consider richening fuelling (lower target lambda) in this region."
+        case .rich:
+            // Rich is safe but costs power and economy — never more than a warning.
+            worst = bucket.peakLow
+            severity = (thresholds.richLambda - bucket.peakLow) >= 0.08 ? .warning : .info
+            message = String(format: "Lambda as rich as %.2f (avg %.2f), richer than %.2f, under load.",
+                             bucket.peakLow, mean, thresholds.richLambda)
+            suggestion = "Consider leaning fuelling (raise target lambda) here to recover power and economy."
         case .boostDeviation:
+            // Signed, so downstream consumers know over (+) vs under (−).
+            worst = signedPeak
             severity = Self.severity(value: peakMagnitude, threshold: thresholds.boostDeviationPsi)
             let sense = signedPeak >= 0 ? "over" : "under"
             message = String(format: "Boost %@ target by up to %.1f psi (avg %.1f) here.",
@@ -131,7 +151,7 @@ public struct AtlasAI: Sendable {
 
         return AtlasFinding(
             category: category, severity: severity, cell: cell,
-            sampleCount: bucket.count, peak: peakMagnitude, mean: mean,
+            sampleCount: bucket.count, peak: worst, mean: mean,
             message: message, suggestion: suggestion
         )
     }
@@ -180,8 +200,8 @@ public struct AtlasAI: Sendable {
     private struct Bucket {
         var count = 0
         var sum = 0.0
-        var peakLow = 0.0   // most-negative reading (for signed boost deviation)
-        var peakHigh = 0.0  // most-positive reading
+        var peakLow = Double.infinity    // lowest reading (richest lambda / deepest underboost)
+        var peakHigh = -Double.infinity  // highest reading
 
         mutating func add(_ value: Double) {
             count += 1

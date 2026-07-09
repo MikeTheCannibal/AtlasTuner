@@ -4,12 +4,14 @@ import Foundation
 public enum AtlasCategory: String, Sendable, Codable, CaseIterable {
     case knock
     case lean
+    case rich
     case boostDeviation
 
     public var displayName: String {
         switch self {
         case .knock: return "Knock"
         case .lean: return "Lean Mixture"
+        case .rich: return "Rich Mixture"
         case .boostDeviation: return "Boost Deviation"
         }
     }
@@ -41,7 +43,8 @@ public struct AtlasFinding: Sendable, Identifiable, Equatable {
     public let cell: CellAddress
     /// Number of offending samples that landed on this cell.
     public let sampleCount: Int
-    /// Worst reading (magnitude) seen at this cell.
+    /// Worst reading at this cell: knock retard magnitude (°), the leanest/richest lambda, or the
+    /// signed boost error in psi (positive = overboost).
     public let peak: Double
     /// Mean reading across the offending samples.
     public let mean: Double

@@ -32,7 +32,12 @@ struct InspectorView: View {
         switch tab {
         case .info: infoTab
         case .revisions: RevisionListView(model: model)
-        case .datalog: DatalogView(model: datalog)
+        case .datalog:
+            DatalogView(model: datalog, applyCorrection: model.openTable == nil ? nil : { correction in
+                model.applyEdit(correction.operation, region: correction.region)
+                // Keep the tracked table current without discarding remaining suggestions.
+                if let table = model.openTable { datalog.refreshTrackedTable(table) }
+            })
         }
     }
 
