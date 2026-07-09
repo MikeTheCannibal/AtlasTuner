@@ -17,7 +17,11 @@ final class DatalogViewModel {
     private(set) var activeCell: CellAddress?
     private(set) var recentCells: [CellAddress] = []
 
+    /// Latest Atlas AI advisory report for the loaded session against the tracked table.
+    private(set) var analysis: AnalysisReport?
+
     private var tracker: ActiveCellTracker?
+    private var trackedTable: CalibrationTable?
     private var xChannel: LogChannel = .rpm
     private var yChannel: LogChannel = .load
     private var source: DatalogSource?
@@ -26,9 +30,21 @@ final class DatalogViewModel {
     /// Configure which table the tracker overlays and which channels drive its axes.
     func trackTable(_ table: CalibrationTable, x: LogChannel = .rpm, y: LogChannel = .load) {
         tracker = ActiveCellTracker(table: table)
+        trackedTable = table
         xChannel = x
         yChannel = y
         heatMap = tracker?.heatMap() ?? []
+        analysis = nil
+    }
+
+    /// Whether an Atlas AI analysis can run (a session is loaded and a table is being tracked).
+    var canAnalyze: Bool { trackedTable != nil && session.sampleCount > 0 }
+
+    /// Run Atlas AI over the loaded session against the tracked table. Advisory only — it never
+    /// edits anything; the result is exposed via `analysis`.
+    func runAnalysis(thresholds: AtlasAI.Thresholds = .init()) {
+        guard let trackedTable else { return }
+        analysis = AtlasAI(thresholds: thresholds).analyze(session, table: trackedTable, x: xChannel, y: yChannel)
     }
 
     func start(source: DatalogSource) {
@@ -57,6 +73,7 @@ final class DatalogViewModel {
         stop()
         self.session = session
         latest = session.samples.last
+        analysis = nil
         guard var tracker else { return }
         tracker.reset()
         tracker.record(session: session, x: xChannel, y: yChannel)

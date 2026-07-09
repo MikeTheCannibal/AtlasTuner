@@ -19,6 +19,7 @@ struct DatalogView: View {
                 Label("Active cell: row \(cell.row), col \(cell.column)", systemImage: "scope")
                     .font(.callout).foregroundStyle(.tint)
             }
+            atlasAI
             Spacer()
         }
         .padding()
@@ -85,6 +86,70 @@ struct DatalogView: View {
         case .empty: return "The file is empty or not readable text."
         case .noColumns: return "No usable channel columns were found in the header row."
         case .noDataRows: return "The file has a header but no numeric sample rows."
+        }
+    }
+
+    // MARK: Atlas AI
+
+    @ViewBuilder private var atlasAI: some View {
+        if model.canAnalyze {
+            Divider()
+            HStack {
+                Label("Atlas AI", systemImage: "sparkles").font(.headline)
+                Spacer()
+                Button("Analyze") { model.runAnalysis() }
+                    .buttonStyle(.bordered)
+            }
+            if let report = model.analysis {
+                atlasResults(report)
+            } else {
+                Text("Advisory knock / lean / boost-deviation scan of this log against the open table. Never edits your calibration.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder private func atlasResults(_ report: AnalysisReport) -> some View {
+        if report.isClean {
+            Label("No knock, lean, or boost issues found in \(report.analyzedSamples) samples.",
+                  systemImage: "checkmark.seal")
+                .font(.callout).foregroundStyle(.green)
+        } else {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(report.findings) { finding in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: icon(finding.severity))
+                                .foregroundStyle(color(finding.severity))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("\(finding.category.displayName) · row \(finding.cell.row), col \(finding.cell.column)")
+                                    .font(.caption.bold())
+                                Text(finding.message).font(.caption2).foregroundStyle(.secondary)
+                                Text(finding.suggestion).font(.caption2).foregroundStyle(.tertiary).italic()
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxHeight: 220)
+            Text("Advisory only — Atlas AI never edits your calibration.")
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+    }
+
+    private func icon(_ severity: AtlasSeverity) -> String {
+        switch severity {
+        case .info: return "info.circle"
+        case .warning: return "exclamationmark.triangle"
+        case .critical: return "exclamationmark.octagon.fill"
+        }
+    }
+
+    private func color(_ severity: AtlasSeverity) -> Color {
+        switch severity {
+        case .info: return .secondary
+        case .warning: return .orange
+        case .critical: return .red
         }
     }
 

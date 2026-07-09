@@ -85,8 +85,12 @@
 
 ## Future modules (per spec)
 
-- [ ] **Atlas AI** — knock/lean/boost-deviation trend detection and region suggestions. Advisory
-      only; never auto-edits. Will consume `LogSession` + `ActiveCellTracker` output.
+- [x] **Atlas AI** — advisory analysis (`AtlasAI` → `AnalysisReport`): maps a `LogSession`'s
+      samples onto an open table's cells and flags knock, lean-under-load, and boost-vs-target
+      deviation regions, each with severity, supporting stats and a suggested (never auto-applied)
+      action. Degrades gracefully when a log lacks a channel. Wired into the datalog panel
+      (`Analyze`). Strictly advisory — it never edits a table or image. Next: cluster adjacent
+      findings into regions, and feed knock/lean trends into a suggested-correction preview.
 - [ ] Surface comparison mode (stock vs modified) and colour-coded difference surface — the diff
       data already exists via `DifferenceEngine`; needs a second mesh + shader path.
 - [ ] Multi-log overlay and per-region time-spent analytics.
