@@ -19,6 +19,9 @@ final class DatalogViewModel {
 
     /// Latest Atlas AI advisory report for the loaded session against the tracked table.
     private(set) var analysis: AnalysisReport?
+    /// Quantified, safety-clamped suggestions applicable to the tracked table. Applying one is
+    /// always an explicit user action routed through the normal (undoable) edit path.
+    private(set) var corrections: [SuggestedCorrection] = []
 
     private var tracker: ActiveCellTracker?
     private var trackedTable: CalibrationTable?
@@ -35,16 +38,31 @@ final class DatalogViewModel {
         yChannel = y
         heatMap = tracker?.heatMap() ?? []
         analysis = nil
+        corrections = []
     }
 
     /// Whether an Atlas AI analysis can run (a session is loaded and a table is being tracked).
     var canAnalyze: Bool { trackedTable != nil && session.sampleCount > 0 }
 
     /// Run Atlas AI over the loaded session against the tracked table. Advisory only — it never
-    /// edits anything; the result is exposed via `analysis`.
+    /// edits anything; the result is exposed via `analysis`/`corrections`.
     func runAnalysis(thresholds: AtlasAI.Thresholds = .init()) {
         guard let trackedTable else { return }
-        analysis = AtlasAI(thresholds: thresholds).analyze(session, table: trackedTable, x: xChannel, y: yChannel)
+        let report = AtlasAI(thresholds: thresholds).analyze(session, table: trackedTable, x: xChannel, y: yChannel)
+        analysis = report
+        corrections = CorrectionEngine(thresholds: thresholds).corrections(for: report, table: trackedTable)
+    }
+
+    /// Drop a suggestion once the user has applied it, so it isn't applied twice; the next
+    /// analysis pass (on fresh data) recomputes from scratch.
+    func markApplied(_ correction: SuggestedCorrection) {
+        corrections.removeAll { $0.id == correction.id }
+    }
+
+    /// Refresh the tracked table's values after an edit without discarding the current
+    /// analysis or the remaining (unapplied) suggestions.
+    func refreshTrackedTable(_ table: CalibrationTable) {
+        trackedTable = table
     }
 
     func start(source: DatalogSource) {
@@ -74,6 +92,7 @@ final class DatalogViewModel {
         self.session = session
         latest = session.samples.last
         analysis = nil
+        corrections = []
         guard var tracker else { return }
         tracker.reset()
         tracker.record(session: session, x: xChannel, y: yChannel)

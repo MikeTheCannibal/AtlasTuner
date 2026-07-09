@@ -94,6 +94,36 @@ final class AtlasAITests: XCTestCase {
         XCTAssertEqual(f.severity, .critical)             // 1.05 - 0.90 = 0.15 ≥ 0.10
     }
 
+    // MARK: Rich
+
+    func testOverlyRichUnderLoadFlagged() {
+        let samples = (0..<5).map { sample(Double($0), rpm: 4000, load: 95, extra: ["lambda": 0.60]) }
+        let report = AtlasAI().analyze(session(samples), table: table())
+        let f = try! XCTUnwrap(report.findings(.rich).first)
+        XCTAssertEqual(f.peak, 0.60, accuracy: 1e-9)      // richest lambda seen
+        XCTAssertEqual(f.severity, .warning)              // 0.72 - 0.60 = 0.12 ≥ 0.08
+        XCTAssertTrue(f.message.contains("richer"))
+    }
+
+    func testSlightlyRichIsInfoAndCruiseIgnored() {
+        // 0.68 under load → 0.04 past the floor → info, not warning.
+        let loaded = (0..<5).map { sample(Double($0), rpm: 3000, load: 90, extra: ["lambda": 0.68]) }
+        let f = try! XCTUnwrap(AtlasAI().analyze(session(loaded), table: table()).findings(.rich).first)
+        XCTAssertEqual(f.severity, .info)
+
+        // Same lambda at cruise load → ignored entirely.
+        let cruise = (0..<5).map { sample(Double($0), rpm: 3000, load: 30, extra: ["lambda": 0.68]) }
+        XCTAssertTrue(AtlasAI().analyze(session(cruise), table: table()).findings(.rich).isEmpty)
+    }
+
+    func testHealthyMixtureBandIsQuiet() {
+        // Inside the band (0.72...0.90) under load: neither lean nor rich.
+        let samples = (0..<5).map { sample(Double($0), rpm: 3000, load: 95, extra: ["lambda": 0.80]) }
+        let report = AtlasAI().analyze(session(samples), table: table())
+        XCTAssertTrue(report.findings(.lean).isEmpty)
+        XCTAssertTrue(report.findings(.rich).isEmpty)
+    }
+
     // MARK: Boost deviation
 
     private var withTarget: [LogChannel] {
@@ -117,7 +147,7 @@ final class AtlasAITests: XCTestCase {
         }
         let report = AtlasAI().analyze(session(samples, channels: withTarget), table: table())
         let f = try! XCTUnwrap(report.findings(.boostDeviation).first)
-        XCTAssertEqual(f.peak, 7.0, accuracy: 1e-9)
+        XCTAssertEqual(f.peak, -7.0, accuracy: 1e-9)      // signed: negative = underboost
         XCTAssertTrue(f.message.contains("under target"))
         XCTAssertEqual(f.severity, .critical)             // 7 psi ≥ 3×2
     }
