@@ -74,9 +74,14 @@
       (MHD) for integrity, which matches Atlas Tune's export-then-flash model. Not ruled out:
       keyed/unknown-polynomial CRCs or checksums over non-contiguous logical-block addresses.
       Revisit only with the documented MG1 algorithm or a segment map.
-- [ ] **Datalog hardware source** — implement a concrete `DatalogSource` for the chosen transport
-      (BLE / Wi-Fi bridge / OBD). The `ReplayDatalogSource` and `PreviewSource` already exercise the
-      pipeline.
+- [x] **Datalog CSV import** — `CSVLogImporter` reads MHD / bootmod3 (and similar) log exports:
+      robust CSV parsing (quoted fields, CRLF/BOM, auto delimiter), header→channel recognition
+      onto the canonical S58 set with unknown columns preserved, ms→s time and AFR→lambda
+      conversion. Imported sessions replay through `ActiveCellTracker` in one pass, so a log lights
+      up the heat map immediately. Wired into the datalog panel (`Import Log`).
+- [ ] **Datalog hardware source** — implement a concrete live `DatalogSource` for the chosen
+      transport (BLE / Wi-Fi bridge / OBD). The `ReplayDatalogSource` and `PreviewSource` already
+      exercise the streaming pipeline; CSV import already exercises the recorded-session path.
 
 ## Future modules (per spec)
 
