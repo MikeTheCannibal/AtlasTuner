@@ -50,7 +50,7 @@ struct SpreadsheetView: View {
             .font(.caption2.monospacedDigit())
             .foregroundStyle(.secondary)
             .frame(minWidth: 56, minHeight: 32)
-            .background(Color(.secondarySystemBackground))
+            .background(Color.secondaryBackground)
     }
 
     private func cell(row: Int, column: Int) -> some View {

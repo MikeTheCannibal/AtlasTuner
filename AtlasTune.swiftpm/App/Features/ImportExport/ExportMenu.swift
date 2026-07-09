@@ -1,6 +1,9 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import AtlasTuneCore
+#if os(macOS)
+import AppKit
+#endif
 
 /// Export actions. Atlas Tune exports — it never flashes. Produces a flashable BIN, a revision
 /// package, or a metadata report, then hands them to the system share sheet / Files.
@@ -30,9 +33,11 @@ struct ExportMenu: View {
                      : "\(validation.errors.count) errors must be resolved before export.")
             }
         }
+        #if os(iOS)
         .sheet(isPresented: $showShare) {
             if let exportURL { ShareSheet(items: [exportURL]) }
         }
+        #endif
     }
 
     private func export(_ format: CalibrationExporter.Format) {
@@ -56,13 +61,19 @@ struct ExportMenu: View {
             let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
             try data.write(to: url)
             exportURL = url
+            #if os(iOS)
             showShare = true
+            #else
+            // No share sheet on macOS — reveal the exported file in Finder instead.
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+            #endif
         } catch {
             // In production this would surface a user-facing error.
         }
     }
 }
 
+#if os(iOS)
 /// Thin `UIActivityViewController` bridge for sharing exported files.
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
@@ -71,3 +82,4 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
+#endif

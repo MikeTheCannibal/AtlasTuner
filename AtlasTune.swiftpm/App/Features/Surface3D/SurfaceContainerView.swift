@@ -47,8 +47,9 @@ struct SurfaceContainerView: View {
     }
 }
 
-/// `UIViewRepresentable` bridging to MetalKit.
-struct MetalSurfaceView: UIViewRepresentable {
+/// Bridges MetalKit into SwiftUI. `UIViewRepresentable` and `NSViewRepresentable` differ only in
+/// method names, so the shared logic lives here and a thin per-platform conformance forwards to it.
+struct MetalSurfaceView {
     let table: CalibrationTable
     let yaw: Float
     let pitch: Float
@@ -56,20 +57,20 @@ struct MetalSurfaceView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIView(context: Context) -> MTKView {
+    fileprivate func makeMTKView(coordinator: Coordinator) -> MTKView {
         let view = MTKView()
         guard let renderer = SurfaceRenderer(mtkView: view) else { return view }
         renderer.update(table: table)
         view.delegate = renderer
-        context.coordinator.renderer = renderer
+        coordinator.renderer = renderer
         return view
     }
 
-    func updateUIView(_ uiView: MTKView, context: Context) {
-        guard let renderer = context.coordinator.renderer else { return }
-        if context.coordinator.tableID != table.definition.id {
+    fileprivate func updateMTKView(coordinator: Coordinator) {
+        guard let renderer = coordinator.renderer else { return }
+        if coordinator.tableID != table.definition.id {
             renderer.update(table: table)
-            context.coordinator.tableID = table.definition.id
+            coordinator.tableID = table.definition.id
         }
         renderer.camera.yaw = yaw
         renderer.camera.pitch = pitch
@@ -81,3 +82,15 @@ struct MetalSurfaceView: UIViewRepresentable {
         var tableID: String?
     }
 }
+
+#if os(macOS)
+extension MetalSurfaceView: NSViewRepresentable {
+    func makeNSView(context: Context) -> MTKView { makeMTKView(coordinator: context.coordinator) }
+    func updateNSView(_ nsView: MTKView, context: Context) { updateMTKView(coordinator: context.coordinator) }
+}
+#else
+extension MetalSurfaceView: UIViewRepresentable {
+    func makeUIView(context: Context) -> MTKView { makeMTKView(coordinator: context.coordinator) }
+    func updateUIView(_ uiView: MTKView, context: Context) { updateMTKView(coordinator: context.coordinator) }
+}
+#endif

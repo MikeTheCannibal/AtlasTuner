@@ -45,7 +45,7 @@ struct DatalogView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(8)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                .background(Color.secondaryBackground, in: RoundedRectangle(cornerRadius: 10))
             }
         }
     }

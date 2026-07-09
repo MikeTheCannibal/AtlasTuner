@@ -63,10 +63,10 @@ struct WorkspaceView: View {
     // MARK: Toolbar
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarLeading) {
+        ToolbarItemGroup(placement: leadingPlacement) {
             Button { showImporter = true } label: { Label("Import", systemImage: "square.and.arrow.down") }
         }
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItemGroup(placement: trailingPlacement) {
             Button { model.undo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .disabled(!model.canUndo)
             Button { model.redo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
@@ -75,6 +75,23 @@ struct WorkspaceView: View {
                 Button("Save Revision…") { _ = model.saveRevision(name: "Revision") }
             } label: { Label("Revisions", systemImage: "clock.arrow.circlepath") }
         }
+    }
+
+    /// `.topBar*` placements are iOS-only; macOS uses the window-toolbar equivalents.
+    private var leadingPlacement: ToolbarItemPlacement {
+        #if os(macOS)
+        .navigation
+        #else
+        .topBarLeading
+        #endif
+    }
+
+    private var trailingPlacement: ToolbarItemPlacement {
+        #if os(macOS)
+        .primaryAction
+        #else
+        .topBarTrailing
+        #endif
     }
 
     private func handleImport(_ result: Result<URL, Error>) {
