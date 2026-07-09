@@ -17,6 +17,8 @@ public struct DefinitionPackage: Codable, Sendable, Identifiable {
     public var signatures: [ROMSignature]
     /// Every table defined for this ROM.
     public var tables: [TableDefinition]
+    /// The family's checksum block layout; `nil` until reverse-engineered for this ROM.
+    public var checksumScheme: ChecksumScheme?
 
     public init(
         id: String,
@@ -25,7 +27,8 @@ public struct DefinitionPackage: Codable, Sendable, Identifiable {
         expectedImageSizes: [Int],
         versionField: VersionField? = nil,
         signatures: [ROMSignature] = [],
-        tables: [TableDefinition] = []
+        tables: [TableDefinition] = [],
+        checksumScheme: ChecksumScheme? = nil
     ) {
         self.id = id
         self.family = family
@@ -34,6 +37,12 @@ public struct DefinitionPackage: Codable, Sendable, Identifiable {
         self.versionField = versionField
         self.signatures = signatures
         self.tables = tables
+        self.checksumScheme = checksumScheme
+    }
+
+    /// Ready-to-use strategy for this family, or `nil` while the scheme is unknown.
+    public var checksumStrategy: ChecksumStrategy? {
+        checksumScheme.map(SchemeChecksumStrategy.init)
     }
 
     // MARK: Lookups

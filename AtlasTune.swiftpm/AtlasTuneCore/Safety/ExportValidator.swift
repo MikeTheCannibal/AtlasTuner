@@ -42,6 +42,17 @@ public struct ExportValidator: Sendable {
             ))
         }
 
+        // Stale checksums are expected after editing and are recomputed at export time, so they
+        // surface as warnings, not errors.
+        if let strategy = package.checksumStrategy {
+            for region in strategy.verify(image) {
+                issues.append(ValidationIssue(
+                    severity: .warning,
+                    message: "Checksum block ‘\(region.name)’ is stale; it will be recomputed on export."
+                ))
+            }
+        }
+
         for definition in package.tables {
             guard definition.address + definition.byteSize <= image.size else {
                 issues.append(ValidationIssue(

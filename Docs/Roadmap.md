@@ -58,8 +58,12 @@
       once a memory-map translation and variant match are in place.
 - [ ] **Non-linear scaling** — XDF non-linear MATH equations are currently linearly approximated
       (none in the supplied file). Add a non-linear `ValueTransform` if a future map needs one.
-- [ ] **Real checksum scheme** — `CRC32ChecksumStrategy` is a placeholder; slot in the documented
-      MG1 block polynomial/seed via the definition package.
+- [ ] **Real checksum scheme** — the engine side is done: `SchemeChecksumStrategy` executes a
+      data-driven `ChecksumScheme` (any Rocksoft CRC-16/32, multi-range blocks, per-block stored
+      byte order) carried by the definition package, wired into `ExportValidator` and BIN export.
+      Remaining: discover the MG1CS049 block layout from a known-good image with
+      `Tools/find_checksums.py` and add it to `s58_mg1cs049.json` (see
+      `Docs/DefinitionEngine.md` § Checksum scheme).
 - [ ] **Datalog hardware source** — implement a concrete `DatalogSource` for the chosen transport
       (BLE / Wi-Fi bridge / OBD). The `ReplayDatalogSource` and `PreviewSource` already exercise the
       pipeline.
