@@ -58,12 +58,22 @@
       once a memory-map translation and variant match are in place.
 - [ ] **Non-linear scaling** — XDF non-linear MATH equations are currently linearly approximated
       (none in the supplied file). Add a non-linear `ValueTransform` if a future map needs one.
-- [ ] **Real checksum scheme** — the engine side is done: `SchemeChecksumStrategy` executes a
-      data-driven `ChecksumScheme` (any Rocksoft CRC-16/32, multi-range blocks, per-block stored
-      byte order) carried by the definition package, wired into `ExportValidator` and BIN export.
-      Remaining: discover the MG1CS049 block layout from a known-good image with
-      `Tools/find_checksums.py` and add it to `s58_mg1cs049.json` (see
-      `Docs/DefinitionEngine.md` § Checksum scheme).
+- [x] **Checksum engine** — `SchemeChecksumStrategy` executes a data-driven `ChecksumScheme`
+      (any Rocksoft CRC-16/32, multi-range blocks, per-block stored byte order) carried by the
+      definition package, wired into `ExportValidator` and BIN export. Reusable for any future
+      ROM family whose integrity is a recoverable stored checksum.
+- [ ] **MG1CS049 checksum scheme — deferred; no recoverable stored checksum found.** Two
+      known-good G87 reads (stock and a map-switch variant, byte-identical outside a 40 KB
+      calibration segment at `0x7e8000`) were swept with `Tools/find_checksums.py --compare` plus
+      a targeted in-segment hunt: 8 CRC-32 variants (full-image and self-referential prefix/split
+      layouts over 11 range-starts), CRC-16 CCITT/ARC, and additive sums, all cross-checked
+      across both images. Nothing survived — the only hits were coincidental. Since a recomputed
+      checksum would have to sit inside the changed segment and none does, MG1CS049 integrity is
+      **not** a plain stored CRC/sum (consistent with Bosch MG1 hardware secure-boot signatures).
+      `checksumScheme` is therefore left unset for S58; edited BINs rely on the flashing tool
+      (MHD) for integrity, which matches Atlas Tune's export-then-flash model. Not ruled out:
+      keyed/unknown-polynomial CRCs or checksums over non-contiguous logical-block addresses.
+      Revisit only with the documented MG1 algorithm or a segment map.
 - [ ] **Datalog hardware source** — implement a concrete `DatalogSource` for the chosen transport
       (BLE / Wi-Fi bridge / OBD). The `ReplayDatalogSource` and `PreviewSource` already exercise the
       pipeline.
