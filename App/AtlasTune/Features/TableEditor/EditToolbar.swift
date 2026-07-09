@@ -13,7 +13,9 @@ struct EditToolbar: View {
             TextField("Value", value: $amount, format: .number)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 96)
+            #if os(iOS)
                 .keyboardType(.numbersAndPunctuation)
+            #endif
 
             Group {
                 opButton("Set", "equal") { .set(amount) }

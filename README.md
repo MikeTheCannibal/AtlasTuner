@@ -64,6 +64,19 @@ open AtlasTune.xcodeproj
 Target device: 2025 iPad Pro (M5), Apple Pencil Pro. Performance goals — open under 1s, 120 FPS
 UI and surface, 100 Hz logging — are documented in `Docs/Architecture.md`.
 
+## Running natively on macOS
+
+The app layer is cross-platform SwiftUI, so the full app also builds and runs as a native macOS
+app straight from SwiftPM — no Xcode project, XcodeGen or code signing required:
+
+```bash
+swift run AtlasTune
+```
+
+The Metal surface shader compiles from source at runtime and SwiftData falls back from CloudKit
+to a local store, so it works without a provisioning profile. Apple Pencil annotation is
+iPadOS-only and compiles out on macOS; exports are revealed in Finder instead of a share sheet.
+
 ## Swift Playgrounds
 
 A ready-to-open Swift Playgrounds App project is provided at **`AtlasTune.swiftpm/`** — open it in
