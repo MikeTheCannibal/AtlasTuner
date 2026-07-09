@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if os(macOS)
+import AppKit
+#endif
 
 /// Application entry point. Atlas Tune is a document-style, multi-window iPadOS app: each
 /// window hosts one calibration workspace, and Stage Manager / external displays are supported
@@ -29,6 +32,18 @@ struct AtlasTuneApp: App {
         }
         fatalError("Unable to create ModelContainer for Atlas Tune")
     }()
+
+    init() {
+        #if os(macOS)
+        // When launched as a bare SwiftPM executable (`swift run AtlasTune`) there is no app
+        // bundle declaring an activation policy, so set one here to get a Dock icon, menu bar
+        // and key window.
+        DispatchQueue.main.async {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        #endif
+    }
 
     var body: some Scene {
         WindowGroup {
