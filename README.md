@@ -53,7 +53,7 @@ The engine builds and tests with SwiftPM:
 swift test            # runs the AtlasTuneCore test suite
 ```
 
-The iPadOS app is generated with [XcodeGen](https://github.com/yonsm/XcodeGen) and opened in Xcode
+The iPadOS app is generated with [XcodeGen](https://github.com/yonaskolb/XcodeGen) and opened in Xcode
 on macOS (the app target requires the iOS SDK, Metal and SwiftData):
 
 ```bash
