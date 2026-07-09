@@ -120,5 +120,24 @@ Tools/find_checksums.py stock.bin --align 0x1000
 ```
 
 It brute-forces eight CRC-32 variants plus additive sums over every aligned boundary pair and
-prints a ready-to-paste JSON snippet for each match. Confirm candidates against a second
-known-good image before committing them to the package.
+prints a ready-to-paste JSON snippet for each match.
+
+**A single scan is not enough.** With tens of thousands of candidate ranges, ten algorithms and
+millions of stored words, hundreds of coincidental 32-bit collisions are expected by chance — a
+raw hit count near that noise floor means nothing real was found. (On the Phase 1 MG1CS049 image
+a 64 KB scan returns ~67 hits, *below* the ~300 expected from chance and scattered across every
+algorithm and both endiannesses: pure noise, no recoverable scheme.)
+
+To separate real checksums from coincidence, compare **two known-good images of the same ROM but
+with different data** (two stock reads from different cars, or a re-read):
+
+```bash
+Tools/find_checksums.py --compare carA.bin carB.bin
+```
+
+A real checksum validates at the same `(range, algorithm, stored offset, endianness)` in both
+images even though its stored value differs; a coincidence would have to recur at those exact
+coordinates in the second image (~2⁻³²), so the noise floor collapses. Only the intersection is
+printed, ranked with the strongest evidence — candidates whose covered block data differs between
+the two reads — first. Even then, sanity-check a candidate by editing a byte in range and
+re-flashing on the bench before trusting it.

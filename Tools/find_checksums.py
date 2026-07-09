@@ -15,20 +15,43 @@ reflected ones, and the non-reflected ones reuse zlib on a bit-reversed copy of 
 (reversing bits of every byte turns an MSB-first CRC into an LSB-first one over the same
 polynomial).
 
-Caveats: results are candidates, not proof — confirm by flipping a byte inside the range,
-recomputing, and checking a second known-good image. Expect a few coincidental "elsewhere"
-matches; matches stored directly after their block are near-certain. Additive (sum32) matches
-are reported for information but the engine currently implements CRC schemes only.
+The trouble with one image: a single scan produces mostly COINCIDENTAL matches. There are tens
+of thousands of candidate block ranges, ten algorithms and millions of stored 32-bit words, so
+hundreds of random 32-bit collisions are expected by chance alone — a raw hit count near that
+noise floor means nothing was really found. The fix is two known-good images of the SAME family
+but DIFFERENT data (two stock reads from different cars, or a re-read):
+
+    Tools/find_checksums.py --compare carA.bin carB.bin
+
+A real checksum validates at the same (range, algorithm, stored offset, endianness) in BOTH
+images even though its stored value differs; a coincidence would have to recur at the exact same
+coordinates in the second image (~2**-32), so the noise floor collapses to near zero. Only the
+intersection is printed, ranked with the strongest evidence — different underlying block data —
+first.
+
+Caveats: additive (sum32) matches are reported for information but the engine currently
+implements CRC schemes only. Even a compare-confirmed candidate should be sanity-checked by
+editing a byte in range and re-flashing on the bench before you trust it.
 """
 
 import argparse
 import struct
 import sys
 import zlib
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 MASK = 0xFFFFFFFF
 BITREV_BYTE = bytes(int(f"{i:08b}"[::-1], 2) for i in range(256))
+
+# A single candidate match. `vi` indexes VARIANTS for a CRC hit; for an additive hit `vi` is
+# None and `sum_label` is set. `value` is the matched 32-bit word (differs per image).
+Finding = namedtuple("Finding", "start end offset order vi sum_label value")
+
+
+def coordinates(f: Finding):
+    """Location+algorithm identity of a finding, independent of the stored value. Two images
+    agree here iff the same block/algorithm/offset/endianness validates in both."""
+    return (f.start, f.end, f.offset, f.order, f.vi, f.sum_label)
 
 
 def bitrev32(v: int) -> int:
@@ -84,26 +107,13 @@ VARIANTS = [
 ]
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("bin", help="known-good image to scan")
-    parser.add_argument("--align", type=lambda v: int(v, 0), default=0x10000,
-                        help="block boundary alignment (default 0x10000)")
-    parser.add_argument("--min-length", type=lambda v: int(v, 0), default=0x1000,
-                        help="ignore candidate blocks shorter than this (default 0x1000)")
-    args = parser.parse_args()
-
-    with open(args.bin, "rb") as f:
-        data = f.read()
-    if len(data) < args.align:
-        sys.exit(f"image ({len(data)} bytes) is smaller than one alignment unit")
-
-    bounds = boundary_list(len(data), args.align)
+def scan(data: bytes, align: int, min_length: int) -> list[Finding]:
+    """All candidate checksum matches in one image."""
+    bounds = boundary_list(len(data), align)
     view = memoryview(data)
     reversed_view = memoryview(data.translate(BITREV_BYTE))
-    print(f"{args.bin}: {len(data)} bytes, {len(bounds) - 1} x {args.align:#x} boundaries")
 
-    # value -> list of (start, end, variant_index) candidates
+    # value -> list of (start, end, variant_index)
     candidates = defaultdict(list)
     snapshots = {
         (True, 0): crc_snapshots(view, bounds, 0),
@@ -116,7 +126,7 @@ def main() -> int:
         for i, start in enumerate(bounds[:-1]):
             for j, crc in enumerate(table[start]):
                 end = bounds[i + 1 + j]
-                if end - start < args.min_length:
+                if end - start < min_length:
                     continue
                 value = transform(crc) & MASK
                 if value not in (0, MASK):
@@ -136,7 +146,7 @@ def main() -> int:
     sum_candidates = defaultdict(list)
     for i, start in enumerate(aligned[:-1]):
         for end in aligned[i + 1:]:
-            if end - start < args.min_length or start not in prefix or end not in prefix:
+            if end - start < min_length or start not in prefix or end not in prefix:
                 continue
             block_sum = (prefix[end] - prefix[start]) & MASK
             for value, label in ((block_sum, "sum32"), ((-block_sum) & MASK, "-sum32")):
@@ -150,31 +160,115 @@ def main() -> int:
         be = struct.unpack_from(">I", data, offset)[0]
         for value, order in ((le, "littleEndian"), (be, "bigEndian")):
             for start, end, vi in candidates.get(value, ()):
-                findings.append((start, end, offset, order, vi, None))
+                findings.append(Finding(start, end, offset, order, vi, None, value))
             for start, end, label in sum_candidates.get(value, ()):
-                findings.append((start, end, offset, order, None, label))
+                findings.append(Finding(start, end, offset, order, None, label, value))
+    return findings
 
+
+def describe(f: Finding) -> str:
+    """Human line + (for CRC hits) a paste-ready JSON snippet."""
+    where = "directly after block" if f.offset == f.end else f"at {f.offset:#x}"
+    note = "  [inside covered range — self-referential, verify manually]" \
+        if f.start <= f.offset < f.end else ""
+    if f.vi is not None:
+        label, _, _, _, snippet = VARIANTS[f.vi]
+        ranges = f'[{{"start": {f.start}, "length": {f.end - f.start}}}]'
+        return (f"block {f.start:#x}..{f.end:#x}  stored {where} ({f.order})  {label}{note}\n"
+                f'  {{"name": "Block {f.start:#x}", "ranges": {ranges}, "storedAt": {f.offset},'
+                f' "storedByteOrder": "{f.order}", "algorithm": {snippet}}}')
+    return (f"block {f.start:#x}..{f.end:#x}  stored {where} ({f.order})  {f.sum_label}"
+            f"{note}  [additive — engine support not yet implemented]")
+
+
+def run_single(path: str, align: int, min_length: int) -> int:
+    with open(path, "rb") as fh:
+        data = fh.read()
+    if len(data) < align:
+        sys.exit(f"image ({len(data)} bytes) is smaller than one alignment unit")
+    bounds = boundary_list(len(data), align)
+    print(f"{path}: {len(data)} bytes, {len(bounds) - 1} x {align:#x} boundaries")
+
+    findings = scan(data, align, min_length)
     if not findings:
         print("no matches — try a smaller --align (e.g. 0x1000) or a different image")
         return 1
 
-    # Stored-adjacent matches are near-certain; list them first.
-    findings.sort(key=lambda f: (f[2] != f[1], f[0]))
-    print(f"\n{len(findings)} candidate match(es); those stored directly after their block first:\n")
-    for start, end, offset, order, vi, sum_label in findings:
-        where = "directly after block" if offset == end else f"at {offset:#x}"
-        inside = start <= offset < end
-        note = "  [inside covered range — self-referential, verify manually]" if inside else ""
-        if vi is not None:
-            label, _, _, _, snippet = VARIANTS[vi]
-            print(f"block {start:#x}..{end:#x}  stored {where} ({order})  {label}{note}")
-            ranges = f'[{{"start": {start}, "length": {end - start}}}]'
-            print(f'  {{"name": "Block {start:#x}", "ranges": {ranges}, "storedAt": {offset},'
-                  f' "storedByteOrder": "{order}", "algorithm": {snippet}}}\n')
-        else:
-            print(f"block {start:#x}..{end:#x}  stored {where} ({order})  {sum_label}"
-                  f"{note}  [additive — engine support not yet implemented]\n")
+    # Stored-adjacent matches are the least likely to be coincidental; list them first.
+    findings.sort(key=lambda f: (f.offset != f.end, f.start))
+    print(f"\n{len(findings)} candidate match(es); those stored directly after their block first.")
+    print("NOTE: expect this to be dominated by coincidence — use --compare with a second "
+          "known-good image to separate real checksums from noise.\n")
+    for f in findings:
+        print(describe(f) + "\n")
     return 0
+
+
+def run_compare(path_a: str, path_b: str, align: int, min_length: int) -> int:
+    with open(path_a, "rb") as fh:
+        data_a = fh.read()
+    with open(path_b, "rb") as fh:
+        data_b = fh.read()
+    if len(data_a) != len(data_b):
+        sys.exit(f"images differ in size ({len(data_a)} vs {len(data_b)}); a checksum layout is "
+                 "size-specific, so compare two reads of the same ROM family")
+    if len(data_a) < align:
+        sys.exit(f"image ({len(data_a)} bytes) is smaller than one alignment unit")
+    if data_a == data_b:
+        sys.exit("the two images are identical — comparison needs different data to filter "
+                 "coincidences; supply two DIFFERENT known-good reads")
+
+    bounds = boundary_list(len(data_a), align)
+    print(f"comparing:\n  A {path_a}\n  B {path_b}")
+    print(f"{len(data_a)} bytes each, {len(bounds) - 1} x {align:#x} boundaries")
+
+    findings_a = scan(data_a, align, min_length)
+    by_coord_b = {coordinates(f): f for f in scan(data_b, align, min_length)}
+    print(f"\nimage A: {len(findings_a)} raw candidates   image B: {len(by_coord_b)} raw candidates")
+
+    survivors = [(a, by_coord_b[c]) for a in findings_a
+                 if (c := coordinates(a)) in by_coord_b]
+    if not survivors:
+        print("\nno candidate survived in both images — nothing here behaves like a real "
+              "checksum at this alignment. Try a smaller --align (e.g. 0x1000, 0x400).")
+        return 1
+
+    # A survivor whose covered block DIFFERS between the two images is strong evidence: the
+    # stored word tracked the data change. Identical block data is weaker (the match could
+    # persist trivially). Rank stronger evidence, then stored-adjacent, first.
+    def block_differs(a: Finding) -> bool:
+        return data_a[a.start:a.end] != data_b[a.start:a.end]
+
+    survivors.sort(key=lambda pair: (not block_differs(pair[0]), pair[0].offset != pair[0].end,
+                                     pair[0].start))
+    strong = sum(1 for a, _ in survivors if block_differs(a))
+    print(f"{len(survivors)} candidate(s) confirmed in BOTH images "
+          f"({strong} with differing block data — strongest evidence):\n")
+    for a, b in survivors:
+        evidence = "block data DIFFERS between A/B — strong" if block_differs(a) \
+            else "block data identical in A/B — weak, may be coincidental"
+        print(describe(a))
+        print(f"  stored value  A={a.value:#010x}  B={b.value:#010x}   [{evidence}]\n")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("bin", nargs="?", help="known-good image to scan")
+    parser.add_argument("--compare", nargs=2, metavar=("A", "B"),
+                        help="two known-good images of the same ROM; print only checksums "
+                             "confirmed in both (filters coincidental matches)")
+    parser.add_argument("--align", type=lambda v: int(v, 0), default=0x10000,
+                        help="block boundary alignment (default 0x10000)")
+    parser.add_argument("--min-length", type=lambda v: int(v, 0), default=0x1000,
+                        help="ignore candidate blocks shorter than this (default 0x1000)")
+    args = parser.parse_args()
+
+    if bool(args.bin) == bool(args.compare):
+        parser.error("give exactly one of: a single image, or --compare A B")
+    if args.compare:
+        return run_compare(*args.compare, args.align, args.min_length)
+    return run_single(args.bin, args.align, args.min_length)
 
 
 if __name__ == "__main__":
