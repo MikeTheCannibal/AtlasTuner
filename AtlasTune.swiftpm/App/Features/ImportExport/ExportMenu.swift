@@ -47,7 +47,7 @@ struct ExportMenu: View {
             let (data, name): (Data, String)
             switch format {
             case .bin:
-                data = try exporter.exportBIN(project.workingImage)
+                data = try exporter.exportBIN(project.workingImage, checksum: project.package.checksumStrategy)
                 name = "AtlasTune.bin"
             case .revisionPackage:
                 data = try exporter.exportRevisionPackage(

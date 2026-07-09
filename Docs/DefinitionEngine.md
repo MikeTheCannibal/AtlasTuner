@@ -82,3 +82,62 @@ Adding B58/S63/etc. in a later phase is a **data** task:
 
 No engine or UI code changes — the navigator, editor, search, diff and export are all driven by the
 package data.
+
+## Checksum scheme
+
+A package may carry the family's checksum block layout in an optional `checksumScheme` field
+(`DefinitionPackage.checksumScheme`). When present, `ExportValidator` verifies the blocks
+(stale checksums surface as warnings) and BIN export recomputes them automatically via
+`SchemeChecksumStrategy`; when absent, exports are unmodified.
+
+```json
+"checksumScheme": {
+  "blocks": [
+    {
+      "name": "Calibration block",
+      "ranges": [
+        {"start": 131072, "length": 393216},
+        {"start": 524292, "length": 131068}
+      ],
+      "storedAt": 524288,
+      "storedByteOrder": "littleEndian",
+      "algorithm": {"preset": "crc32-bzip2"}
+    }
+  ]
+}
+```
+
+`ranges` are fed to the CRC in order, so a block excludes its own stored checksum by splitting
+around it. `algorithm` is either a preset (`crc32`, `crc32-bzip2`, `crc32-mpeg2`, `crc32-posix`,
+`crc16-ccitt-false`, `crc16-arc`) or explicit Rocksoft parameters — `width`, `polynomial`,
+`initialValue`, `xorOut` (numbers or `"0x…"` hex strings), `reflectInput`, `reflectOutput`.
+
+To discover the real block layout for a family, run the scanner against a **known-good** image:
+
+```bash
+Tools/find_checksums.py stock.bin            # 64 KB boundaries
+Tools/find_checksums.py stock.bin --align 0x1000
+```
+
+It brute-forces eight CRC-32 variants plus additive sums over every aligned boundary pair and
+prints a ready-to-paste JSON snippet for each match.
+
+**A single scan is not enough.** With tens of thousands of candidate ranges, ten algorithms and
+millions of stored words, hundreds of coincidental 32-bit collisions are expected by chance — a
+raw hit count near that noise floor means nothing real was found. (On the Phase 1 MG1CS049 image
+a 64 KB scan returns ~67 hits, *below* the ~300 expected from chance and scattered across every
+algorithm and both endiannesses: pure noise, no recoverable scheme.)
+
+To separate real checksums from coincidence, compare **two known-good images of the same ROM but
+with different data** (two stock reads from different cars, or a re-read):
+
+```bash
+Tools/find_checksums.py --compare carA.bin carB.bin
+```
+
+A real checksum validates at the same `(range, algorithm, stored offset, endianness)` in both
+images even though its stored value differs; a coincidence would have to recur at those exact
+coordinates in the second image (~2⁻³²), so the noise floor collapses. Only the intersection is
+printed, ranked with the strongest evidence — candidates whose covered block data differs between
+the two reads — first. Even then, sanity-check a candidate by editing a byte in range and
+re-flashing on the bench before trusting it.
