@@ -39,6 +39,16 @@ public struct ActiveCellTracker: Sendable {
         self.lastVisit = Array(repeating: Array(repeating: 0, count: columns), count: rows)
     }
 
+    /// Replay an entire recorded session, mapping the `x`/`y` channels of each sample onto cells.
+    /// Samples missing the x channel are skipped. This is how an imported datalog fills the heat
+    /// map in one pass.
+    public mutating func record(session: LogSession, x: LogChannel, y: LogChannel) {
+        for sample in session.samples {
+            guard let xValue = sample.value(x) else { continue }
+            record(x: xValue, y: sample.value(y))
+        }
+    }
+
     /// Record one operating point and return the cell it mapped to.
     @discardableResult
     public mutating func record(x: Double, y: Double? = nil) -> CellAddress {

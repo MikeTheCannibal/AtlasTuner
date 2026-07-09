@@ -1,14 +1,19 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import AtlasTuneCore
 
-/// Live datalog panel: current channel readouts plus start/stop and CSV export. The heat-map
-/// overlay it produces is consumed by the spreadsheet/surface editors via the view model.
+/// Live datalog panel: current channel readouts, start/stop, CSV export, and importing a
+/// recorded MHD/bootmod3 log. The heat-map overlay it produces is consumed by the
+/// spreadsheet/surface editors via the view model.
 struct DatalogView: View {
     @Bindable var model: DatalogViewModel
+    @State private var showImporter = false
+    @State private var importError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            sessionSummary
             channelGrid
             if let cell = model.activeCell {
                 Label("Active cell: row \(cell.row), col \(cell.column)", systemImage: "scope")
@@ -17,12 +22,25 @@ struct DatalogView: View {
             Spacer()
         }
         .padding()
+        .fileImporter(isPresented: $showImporter,
+                      allowedContentTypes: [.commaSeparatedText, .plainText, .text]) { result in
+            handleImport(result)
+        }
+        .alert("Import failed", isPresented: .constant(importError != nil)) {
+            Button("OK") { importError = nil }
+        } message: {
+            Text(importError ?? "")
+        }
     }
 
     private var header: some View {
         HStack {
             Text("Datalog").font(.title2.bold())
             Spacer()
+            Button { showImporter = true } label: {
+                Label("Import Log", systemImage: "square.and.arrow.down")
+            }
+            .buttonStyle(.bordered)
             Button {
                 model.isLogging ? model.stop() : model.start(source: PreviewSource())
             } label: {
@@ -31,6 +49,42 @@ struct DatalogView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(model.isLogging ? .red : .green)
+        }
+    }
+
+    /// After an import, show what was loaded: sample count, duration, rate, matched channels.
+    @ViewBuilder private var sessionSummary: some View {
+        if !model.isLogging, model.session.sampleCount > 0 {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.session.name).font(.callout.bold()).lineLimit(1)
+                Text("\(model.session.sampleCount) samples · \(model.session.duration, format: .number.precision(.fractionLength(1)))s · \(model.session.averageRate, format: .number.precision(.fractionLength(0))) Hz · \(model.session.channels.count) channels")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(Color.secondaryBackground, in: RoundedRectangle(cornerRadius: 10))
+        }
+    }
+
+    private func handleImport(_ result: Result<URL, Error>) {
+        guard case let .success(url) = result else { return }
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            try model.importCSV(data, name: url.deletingPathExtension().lastPathComponent)
+        } catch let error as CSVLogImporter.ImportError {
+            importError = message(for: error)
+        } catch {
+            importError = error.localizedDescription
+        }
+    }
+
+    private func message(for error: CSVLogImporter.ImportError) -> String {
+        switch error {
+        case .empty: return "The file is empty or not readable text."
+        case .noColumns: return "No usable channel columns were found in the header row."
+        case .noDataRows: return "The file has a header but no numeric sample rows."
         }
     }
 

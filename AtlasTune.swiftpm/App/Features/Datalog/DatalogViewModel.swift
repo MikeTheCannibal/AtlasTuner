@@ -51,6 +51,27 @@ final class DatalogViewModel {
         isLogging = false
     }
 
+    /// Load a recorded session (e.g. an imported MHD/bootmod3 CSV) and replay it through the
+    /// active-cell tracker in one pass, so the heat map and recent-cell trail populate immediately.
+    func loadSession(_ session: LogSession) {
+        stop()
+        self.session = session
+        latest = session.samples.last
+        guard var tracker else { return }
+        tracker.reset()
+        tracker.record(session: session, x: xChannel, y: yChannel)
+        activeCell = tracker.current
+        heatMap = tracker.heatMap()
+        recentCells = tracker.recentCells(12)
+        self.tracker = tracker
+    }
+
+    /// Parse a datalog CSV and load it. Throws `CSVLogImporter.ImportError` on malformed input.
+    func importCSV(_ data: Data, name: String) throws {
+        let session = try CSVLogImporter().session(from: data, name: name)
+        loadSession(session)
+    }
+
     private func ingest(_ sample: LogSample) {
         session.append(sample)
         latest = sample
