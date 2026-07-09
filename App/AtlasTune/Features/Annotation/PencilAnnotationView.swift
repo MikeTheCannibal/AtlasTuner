@@ -1,3 +1,4 @@
+#if os(iOS)
 import SwiftUI
 import PencilKit
 
@@ -71,3 +72,12 @@ extension View {
     /// Make any editor surface markable with Apple Pencil.
     func annotatable() -> some View { modifier(AnnotatableModifier()) }
 }
+#else
+import SwiftUI
+
+/// PencilKit's `PKCanvasView` is UIKit-only; on macOS annotation is a no-op so shared feature
+/// code can still call `.annotatable()`.
+extension View {
+    func annotatable() -> some View { self }
+}
+#endif
