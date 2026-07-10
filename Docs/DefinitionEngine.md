@@ -73,6 +73,22 @@ Mapping highlights: `mmedaddress` → file offset; element size + `mmedtypeflags
 0x10000 float) → `DataType`; MATH equation → linear `Scaling`; XDF category → one of the five
 top-level categories with the original name kept as `subcategory`.
 
+## Cross-variant name recovery
+
+The MHD+-derived XDF that `Tools/xdf_to_definition.py` consumed leaves some tables unnamed —
+these get a synthetic `"... (autogen)"` title. A related S58 variant's XDF (`F4C9L8R5B`,
+same 8 MB layout and base offset) is fully authored with no autogen titles, so in principle its
+table names can be borrowed wherever the two variants share a flash address.
+
+In practice, address equality across variants is a **weak** signal on its own: of 13 candidate
+matches checked, 3 named a completely different, semantically unrelated table at the same
+address — a coincidental collision between the two builds' memory layouts, not the same
+calibration. Only address matches whose meaning was independently confirmed by consistent
+semantics on both sides were applied (6 tables, an oil-pressure breakpoint cluster at
+`0x700e8a`–`0x701010`, `s58_mg1cs049.json` ids `xdf0000/0001/0003/0004/0006/0007`). Do **not**
+bulk-apply address matches from another variant without checking each one's semantics — a wrong
+label is worse than an honest `"(autogen)"`.
+
 ## Adding a ROM family
 
 Adding B58/S63/etc. in a later phase is a **data** task:

@@ -74,6 +74,16 @@
       (MHD) for integrity, which matches Atlas Tune's export-then-flash model. Not ruled out:
       keyed/unknown-polynomial CRCs or checksums over non-contiguous logical-block addresses.
       Revisit only with the documented MG1 algorithm or a segment map.
+      **Reinforced, not overturned, by a later A2L cross-check:** an MG Flasher-authored A2L for
+      a related variant declares real `MEMORY_SEGMENT` blocks with a TriCore virtual→file-offset
+      base (`virtual = file_offset + 0x80000000`), validated against three independently-known
+      real offsets (banner, both ID signatures) landing exactly inside their declared segments.
+      Its calibration segment (`0x700000`–`0x7FF7E0`, matching our table region almost exactly)
+      is tagged `XCP_CRC_32`, giving a much sharper, non-guessed hypothesis than the first pass —
+      re-tested with the exact segment boundaries plus CRC-16 and additive sums, self-referential
+      and externally-stored, against both known-good images. Still nothing. The tag most likely
+      describes the *XCP transport protocol's* own on-the-wire integrity check (computed live by
+      the calibration tool), not a value persisted in the file.
 - [x] **Datalog CSV import** — `CSVLogImporter` reads MHD / bootmod3 (and similar) log exports:
       robust CSV parsing (quoted fields, CRLF/BOM, auto delimiter), header→channel recognition
       onto the canonical S58 set with unknown columns preserved, ms→s time and AFR→lambda

@@ -51,6 +51,29 @@ final class S58IdentificationTests: XCTestCase {
         XCTAssertTrue(cats.contains(.ignition))
     }
 
+    /// These six oil-pressure breakpoint tables were unnamed ("(autogen)") in the bundled
+    /// MHD+-derived XDF. Their real names were recovered by address-matching against a
+    /// different S58 variant's XDF (F4C9L8R5B) whose titles are fully authored — the addresses
+    /// and semantics agree cleanly, unlike several other candidate matches at the same addresses
+    /// that turned out to name unrelated tables (a coincidental collision between variants), so
+    /// only these were applied. See Docs/DefinitionEngine.md § Cross-variant name recovery.
+    func testOilPressureTableNamesRecoveredFromRelatedVariant() throws {
+        let package = try XCTUnwrap(DefinitionPackage.bundled(named: "s58_mg1cs049"))
+        let expected: [String: String] = [
+            "xdf0000": "Speed and oil temperature dependent factor for taking oil pressure offset into account X",
+            "xdf0001": "Speed and oil temperature dependent factor for taking oil pressure offset into account Y",
+            "xdf0003": "Load-dependent oil pressure setpoint offset X",
+            "xdf0004": "Load-dependent oil pressure setpoint offset Y",
+            "xdf0006": "Oil pressure setpoint for regulated oil pump X",
+            "xdf0007": "Oil pressure setpoint for regulated oil pump Y",
+        ]
+        for (id, name) in expected {
+            let table = try XCTUnwrap(package.table(id: id), "missing \(id)")
+            XCTAssertEqual(table.name, name)
+            XCTAssertFalse(table.name.contains("autogen"))
+        }
+    }
+
     func testProjectOpensRealImageWithAllTables() throws {
         let project = try XCTUnwrap(CalibrationProject.open(image: syntheticMG1CS049()))
         XCTAssertEqual(project.package.id, "bmw.s58.mg1cs049.cb011")
