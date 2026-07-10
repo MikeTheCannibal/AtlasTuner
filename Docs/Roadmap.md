@@ -35,6 +35,9 @@
 - [x] Export menu (BIN / revision package / report) + validation
 - [x] Apple Pencil markup overlay (PencilKit)
 - [x] XcodeGen `project.yml`, Info.plist, entitlements
+- [x] **Open Sample** — `SampleImage.s58()` builds a synthetic, fully explorable S58 image
+      (correct size + identification bytes + every table filled with in-range shape) so the app
+      can be opened and browsed with no real dump — for the Simulator, onboarding and demos.
 
 ## Reconciled against a real image
 

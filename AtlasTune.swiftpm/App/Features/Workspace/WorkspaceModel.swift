@@ -38,6 +38,19 @@ final class WorkspaceModel {
 
     // MARK: Import
 
+    /// Open a bundled synthetic S58 image so the app can be explored without a real dump — useful
+    /// on the Simulator and for onboarding/demo, where no BIN can be side-loaded.
+    func openSample() async {
+        state = .identifying
+        let opened = await Task.detached(priority: .userInitiated) {
+            CalibrationProject.open(image: SampleImage.s58())
+        }.value
+        guard let opened else { state = .unrecognized; return }
+        project = opened
+        state = .ready
+        refreshSearch()
+    }
+
     /// Identify and open imported BIN bytes. Identification runs off the main actor.
     func importImage(_ data: Data) async {
         state = .identifying
