@@ -40,14 +40,65 @@ whether the data came from a file or the car.
 Datalog panel → enter the vehicle's DoIP IP → **Connect**. Samples stream in; **Stop** ends the
 session.
 
+## Reconciling the real S58 DID map (learning from the car)
+
+The live source needs to know **which DID carries which channel and its scaling**. Rather than trust
+the `s58Placeholder` guesses, Atlas Tune *learns* the map from data, using an MHD log as ground
+truth. `AtlasDIDTool` and the scanner are **read-only** — they issue only `ReadDataByIdentifier`
+(0x22) and never write to the ECU.
+
+### You don't need both loggers connected at once
+
+MHD runs on your phone; the Mac connects over the DoIP cable, and they can't share the OBD port —
+that's fine. Cross-correlation only needs the two logs to describe the **same events**, not the same
+connection. Every log contains RPM, whose idle/rev/decel fingerprint is unmistakable, so two
+*separate* drives are aligned afterwards by warping their timelines until the RPM traces line up;
+once RPM aligns, every other channel aligns with it.
+
+### Script *held steady-states*, not sweeps
+
+Two separate drives can't reproduce identical transients but can reproduce **held operating points**:
+
+> idle 30 s → hold 2000 rpm 10 s → 3000 rpm 10 s → 4000 rpm part-throttle 10 s →
+> 4000 rpm near-WOT 10 s → decel → repeat once
+
+Holds give high confidence on RPM/load/throttle/temps, good on boost, honest-but-lower on
+lambda/knock. Discovery and the RPM/temps/throttle channels can be done **stationary**; only
+load-dependent channels (boost, lambda, knock) need a drive or dyno.
+
+### Procedure
+
+```bash
+# 1. Discover which DIDs the ECU answers (stationary, read-only)      → did_scan.csv
+swift run AtlasDIDTool scan 169.254.x.x
+
+# 2. Capture raw DID values over the scripted drive (Atlas only)      → did_capture.csv
+swift run AtlasDIDTool capture 169.254.x.x --dids 0xF40C,0xF40B,… --seconds 120
+#    …and log the SAME script in MHD; export its CSV.
+
+# 3. Reconcile: correlate raw DIDs vs the labelled MHD log (offline)  → live_channels.json
+swift run AtlasDIDTool reconcile did_capture.csv mhd_log.csv
+```
+
+`reconcile` aligns the logs on RPM, finds the DID whose raw series best tracks each MHD channel, fits
+the linear scaling by least squares, and reports Pearson *r* plus the runner-up margin. Only channels
+that are well-correlated **and** clearly separated from the runner-up are marked confident (`✓`) and
+written to `live_channels.json` — a `LiveChannelSet` you drop into the S58 definition. Review the `?`
+rows and confirm against a second capture before trusting them.
+
+**Honest limits:** this is a capture→analyze→verify loop, not interactive real-time probing; each DID
+is treated as a single value (multi-field DIDs surface as low-confidence); some DIDs need an extended
+session or security access to read.
+
 ## Status and caveats
 
 - **The transport, framing, UDS and streaming are implemented and tested** — unit tests cover the
   codecs and an end-to-end loopback test drives `LiveDatalogSource` against an in-memory DoIP ECU;
   the real `TCPByteTransport` was verified against a live loopback TCP DoIP server.
 - **The S58 DID map (`LiveChannelSet.s58Placeholder`) is provisional.** The data identifiers and
-  scalings are conventional/OBD-style placeholders and must be reconciled against a real G87
-  (an ODX/A2L or logging the car and comparing to MHD) before the readings are trustworthy. This
+  scalings are conventional/OBD-style placeholders and must be reconciled against a real G87 before
+  the readings are trustworthy — see *Reconciling the real S58 DID map* above for the read-only
+  `AtlasDIDTool` workflow that learns the map by correlating a car capture against an MHD log. This
   is a *data* change — no code edits — matching the definition-engine philosophy.
 - **Discovery is out of scope here.** Construct the session with the DoIP entity's IP and logical
   address directly. The UDP vehicle-identification broadcast/announcement and DoIP security access
