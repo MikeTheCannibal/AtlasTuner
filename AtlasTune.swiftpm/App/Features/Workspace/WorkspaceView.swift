@@ -41,6 +41,9 @@ struct WorkspaceView: View {
             } actions: {
                 Button("Import BIN") { showImporter = true }
                     .buttonStyle(.borderedProminent)
+                Button("Open Sample") { Task { await model.openSample() } }
+                    .buttonStyle(.bordered)
+                    .help("Explore a synthetic S58 calibration — no file needed")
             }
         default:
             CategoryNavigatorView(model: model)
