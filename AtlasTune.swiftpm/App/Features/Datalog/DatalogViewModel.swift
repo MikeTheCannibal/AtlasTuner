@@ -79,12 +79,25 @@ final class DatalogViewModel {
         }
     }
 
+    /// The DID map used for live streaming. Starts as the placeholder S58 set; the in-app DID
+    /// reconciliation flow replaces it with a set reconciled against the real vehicle.
+    var liveChannelSet: LiveChannelSet = .s58Placeholder
+
+    /// True once `liveChannelSet` has been replaced by a reconciled (non-placeholder) map.
+    private(set) var liveChannelSetIsReconciled = false
+
+    /// Adopt a DID map produced by the in-app reconciliation flow for subsequent live sessions.
+    func applyReconciledChannelSet(_ set: LiveChannelSet) {
+        liveChannelSet = set
+        liveChannelSetIsReconciled = true
+    }
+
     /// Connect to a live vehicle over DoIP (Ethernet/RJ45 from the OBD port) and stream samples
     /// through the same pipeline as a replayed log — the heat map and active-cell tracker update
     /// live. `host` is the DoIP entity's IP; `port` defaults to the ISO 13400 standard 13400.
-    func startLive(host: String, port: UInt16 = doIPPort, channelSet: LiveChannelSet = .s58Placeholder) {
+    func startLive(host: String, port: UInt16 = doIPPort) {
         let transport = TCPByteTransport(host: host, port: port)
-        start(source: LiveDatalogSource(transport: transport, channelSet: channelSet))
+        start(source: LiveDatalogSource(transport: transport, channelSet: liveChannelSet))
     }
 
     func stop() {

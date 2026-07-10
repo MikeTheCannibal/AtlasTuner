@@ -100,6 +100,12 @@
       server. See `Docs/LiveDatalog.md`. **Provisional:** the S58 DID map is placeholder and
       needs reconciling against a real G87; vehicle discovery, DoIP security access, and a BLE
       `ByteTransport` are the remaining pieces.
+- [x] **In-app DID-map reconciliation** — the read-only scan → capture → correlate-against-MHD
+      workflow that recovers the real S58 DID map is built into the app (datalog panel →
+      `Reconcile DID Map…`), driving the `DIDScanner`/`DIDCapture`/`DIDReconciler` engine. Applies
+      the confident map to live logging in-session or exports it as JSON. The standalone
+      `AtlasDIDTool` CLI target was removed — the capability lives in the app, not a separate
+      runtime.
 
 ## Future modules (per spec)
 

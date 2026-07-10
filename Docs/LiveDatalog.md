@@ -44,7 +44,8 @@ session.
 
 The live source needs to know **which DID carries which channel and its scaling**. Rather than trust
 the `s58Placeholder` guesses, Atlas Tune *learns* the map from data, using an MHD log as ground
-truth. `AtlasDIDTool` and the scanner are **read-only** — they issue only `ReadDataByIdentifier`
+truth. This runs **inside the app** — Datalog panel → **Reconcile DID Map…** — with no separate
+tool or runtime. Scanning and capture are **read-only**: they issue only `ReadDataByIdentifier`
 (0x22) and never write to the ECU.
 
 ### You don't need both loggers connected at once
@@ -66,25 +67,22 @@ Holds give high confidence on RPM/load/throttle/temps, good on boost, honest-but
 lambda/knock. Discovery and the RPM/temps/throttle channels can be done **stationary**; only
 load-dependent channels (boost, lambda, knock) need a drive or dyno.
 
-### Procedure
+### Procedure (all in-app)
 
-```bash
-# 1. Discover which DIDs the ECU answers (stationary, read-only)      → did_scan.csv
-swift run AtlasDIDTool scan 169.254.x.x
+Open the datalog panel and tap **Reconcile DID Map…**. The sheet walks three steps:
 
-# 2. Capture raw DID values over the scripted drive (Atlas only)      → did_capture.csv
-swift run AtlasDIDTool capture 169.254.x.x --dids 0xF40C,0xF40B,… --seconds 120
-#    …and log the SAME script in MHD; export its CSV.
+1. **Scan** — enter the vehicle's DoIP IP and scan; the app lists which DIDs the ECU answers and
+   their widths (stationary, read-only).
+2. **Capture** — record raw DID values over the scripted drive (Atlas only). Log the **same** script
+   in MHD separately and export its CSV. (Captured earlier? **Import…** a saved capture instead.)
+3. **Reconcile** — choose the MHD log and tap Reconcile.
 
-# 3. Reconcile: correlate raw DIDs vs the labelled MHD log (offline)  → live_channels.json
-swift run AtlasDIDTool reconcile did_capture.csv mhd_log.csv
-```
-
-`reconcile` aligns the logs on RPM, finds the DID whose raw series best tracks each MHD channel, fits
-the linear scaling by least squares, and reports Pearson *r* plus the runner-up margin. Only channels
-that are well-correlated **and** clearly separated from the runner-up are marked confident (`✓`) and
-written to `live_channels.json` — a `LiveChannelSet` you drop into the S58 definition. Review the `?`
-rows and confirm against a second capture before trusting them.
+The reconciler aligns the logs on RPM, finds the DID whose raw series best tracks each MHD channel,
+fits the linear scaling by least squares, and reports Pearson *r* plus the runner-up margin. Channels
+that are well-correlated **and** clearly separated from the runner-up are marked confident (`✓`).
+**Apply** adopts the confident map for live logging this session; **Export JSON** saves it as a
+`LiveChannelSet` to fold into the S58 definition. Review the `?` rows and confirm against a second
+capture before trusting them.
 
 **Honest limits:** this is a capture→analyze→verify loop, not interactive real-time probing; each DID
 is treated as a single value (multi-field DIDs surface as low-confidence); some DIDs need an extended
@@ -97,8 +95,8 @@ session or security access to read.
   the real `TCPByteTransport` was verified against a live loopback TCP DoIP server.
 - **The S58 DID map (`LiveChannelSet.s58Placeholder`) is provisional.** The data identifiers and
   scalings are conventional/OBD-style placeholders and must be reconciled against a real G87 before
-  the readings are trustworthy — see *Reconciling the real S58 DID map* above for the read-only
-  `AtlasDIDTool` workflow that learns the map by correlating a car capture against an MHD log. This
+  the readings are trustworthy — see *Reconciling the real S58 DID map* above for the in-app,
+  read-only workflow that learns the map by correlating a car capture against an MHD log. This
   is a *data* change — no code edits — matching the definition-engine philosophy.
 - **Discovery is out of scope here.** Construct the session with the DoIP entity's IP and logical
   address directly. The UDP vehicle-identification broadcast/announcement and DoIP security access

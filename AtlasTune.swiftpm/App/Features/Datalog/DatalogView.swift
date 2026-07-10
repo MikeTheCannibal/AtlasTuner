@@ -13,6 +13,8 @@ struct DatalogView: View {
     @State private var showImporter = false
     @State private var importError: String?
     @State private var liveHost = ""
+    @State private var reconcile = DIDReconcileModel()
+    @State private var showReconcile = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -36,6 +38,11 @@ struct DatalogView: View {
             Button("OK") { importError = nil }
         } message: {
             Text(importError ?? "")
+        }
+        .sheet(isPresented: $showReconcile) {
+            DIDReconcileView(model: reconcile,
+                             onApply: { model.applyReconciledChannelSet($0) },
+                             onClose: { showReconcile = false })
         }
     }
 
@@ -67,18 +74,30 @@ struct DatalogView: View {
             Label("Streaming live over DoIP…", systemImage: "dot.radiowaves.left.and.right")
                 .font(.callout).foregroundStyle(.green)
         } else {
-            HStack(spacing: 8) {
-                TextField("Vehicle DoIP IP (e.g. 169.254.x.x)", text: $liveHost)
-                    .textFieldStyle(.roundedBorder)
-                #if os(iOS)
-                    .keyboardType(.numbersAndPunctuation)
-                    .autocorrectionDisabled()
-                #endif
-                Button { model.startLive(host: liveHost) } label: {
-                    Label("Connect", systemImage: "cable.connector")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    TextField("Vehicle DoIP IP (e.g. 169.254.x.x)", text: $liveHost)
+                        .textFieldStyle(.roundedBorder)
+                    #if os(iOS)
+                        .keyboardType(.numbersAndPunctuation)
+                        .autocorrectionDisabled()
+                    #endif
+                    Button { model.startLive(host: liveHost) } label: {
+                        Label("Connect", systemImage: "cable.connector")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(liveHost.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(liveHost.trimmingCharacters(in: .whitespaces).isEmpty)
+                HStack(spacing: 6) {
+                    Button { showReconcile = true } label: {
+                        Label("Reconcile DID Map…", systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(.bordered).controlSize(.small)
+                    Label(model.liveChannelSetIsReconciled ? "Reconciled map active" : "Using placeholder DID map",
+                          systemImage: model.liveChannelSetIsReconciled ? "checkmark.seal" : "exclamationmark.triangle")
+                        .font(.caption2)
+                        .foregroundStyle(model.liveChannelSetIsReconciled ? .green : .orange)
+                }
             }
         }
     }
