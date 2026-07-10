@@ -79,9 +79,17 @@
       onto the canonical S58 set with unknown columns preserved, ms→s time and AFR→lambda
       conversion. Imported sessions replay through `ActiveCellTracker` in one pass, so a log lights
       up the heat map immediately. Wired into the datalog panel (`Import Log`).
-- [ ] **Datalog hardware source** — implement a concrete live `DatalogSource` for the chosen
-      transport (BLE / Wi-Fi bridge / OBD). The `ReplayDatalogSource` and `PreviewSource` already
-      exercise the streaming pipeline; CSV import already exercises the recorded-session path.
+- [x] **Live datalog over DoIP (Ethernet/RJ45)** — full ISO 13400 / 14229 stack:
+      `DoIPMessage` framing, `UDSService` (`ReadDataByIdentifier` + NRC), data-driven
+      `UDSDataIdentifier`/`LiveChannelSet` DID maps, `LiveChannelDecoder`, a swappable
+      `ByteTransport` (`TCPByteTransport` on Network.framework for the OBD→RJ45 wired path),
+      `DoIPClient` orchestration (routing activation, polling, 0x78 handling), and
+      `LiveDatalogSource` that streams into the existing `DatalogSource` pipeline — so the live
+      heat map / tracker / Atlas AI work identically to imported logs. Wired into the datalog
+      panel (`Connect`). Tested end-to-end via an in-memory DoIP ECU and a real loopback TCP
+      server. See `Docs/LiveDatalog.md`. **Provisional:** the S58 DID map is placeholder and
+      needs reconciling against a real G87; vehicle discovery, DoIP security access, and a BLE
+      `ByteTransport` are the remaining pieces.
 
 ## Future modules (per spec)
 

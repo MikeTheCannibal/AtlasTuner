@@ -13,6 +13,8 @@ let package = Package(
         // signing required — the Metal shader compiles from source at runtime and SwiftData
         // falls back from CloudKit to a local store.
         .executable(name: "AtlasTune", targets: ["AtlasTuneMac"]),
+        // Read-only CLI to reconcile the live DID map from the car: `swift run AtlasDIDTool`.
+        .executable(name: "AtlasDIDTool", targets: ["AtlasDIDTool"]),
     ],
     targets: [
         .target(
@@ -32,6 +34,11 @@ let package = Package(
                 // (the renderer falls back to SurfaceShaderSource at runtime).
                 "Resources",
             ]
+        ),
+        .executableTarget(
+            name: "AtlasDIDTool",
+            dependencies: ["AtlasTuneCore"],
+            path: "Sources/AtlasDIDTool"
         ),
         .testTarget(
             name: "AtlasTuneCoreTests",
