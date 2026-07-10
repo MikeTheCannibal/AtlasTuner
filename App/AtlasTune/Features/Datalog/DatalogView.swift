@@ -12,10 +12,12 @@ struct DatalogView: View {
     var applyCorrection: ((SuggestedCorrection) -> Void)?
     @State private var showImporter = false
     @State private var importError: String?
+    @State private var liveHost = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            liveControls
             sessionSummary
             channelGrid
             if let cell = model.activeCell {
@@ -45,14 +47,39 @@ struct DatalogView: View {
                 Label("Import Log", systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.bordered)
-            Button {
-                model.isLogging ? model.stop() : model.start(source: PreviewSource())
-            } label: {
-                Label(model.isLogging ? "Stop" : "Start",
-                      systemImage: model.isLogging ? "stop.fill" : "play.fill")
+            .disabled(model.isLogging)
+            if model.isLogging {
+                Button { model.stop() } label: { Label("Stop", systemImage: "stop.fill") }
+                    .buttonStyle(.borderedProminent).tint(.red)
+            } else {
+                Button { model.start(source: PreviewSource()) } label: {
+                    Label("Demo", systemImage: "play.fill")
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(model.isLogging ? .red : .green)
+        }
+    }
+
+    /// Live connection to the car over DoIP (OBD → RJ45 → this Mac/iPad). Enter the vehicle's
+    /// DoIP IP and connect; samples then stream into the same heat map / analysis pipeline.
+    @ViewBuilder private var liveControls: some View {
+        if model.isLogging {
+            Label("Streaming live over DoIP…", systemImage: "dot.radiowaves.left.and.right")
+                .font(.callout).foregroundStyle(.green)
+        } else {
+            HStack(spacing: 8) {
+                TextField("Vehicle DoIP IP (e.g. 169.254.x.x)", text: $liveHost)
+                    .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                    .keyboardType(.numbersAndPunctuation)
+                    .autocorrectionDisabled()
+                #endif
+                Button { model.startLive(host: liveHost) } label: {
+                    Label("Connect", systemImage: "cable.connector")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(liveHost.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
         }
     }
 

@@ -79,6 +79,14 @@ final class DatalogViewModel {
         }
     }
 
+    /// Connect to a live vehicle over DoIP (Ethernet/RJ45 from the OBD port) and stream samples
+    /// through the same pipeline as a replayed log — the heat map and active-cell tracker update
+    /// live. `host` is the DoIP entity's IP; `port` defaults to the ISO 13400 standard 13400.
+    func startLive(host: String, port: UInt16 = doIPPort, channelSet: LiveChannelSet = .s58Placeholder) {
+        let transport = TCPByteTransport(host: host, port: port)
+        start(source: LiveDatalogSource(transport: transport, channelSet: channelSet))
+    }
+
     func stop() {
         task?.cancel()
         source?.stop()
