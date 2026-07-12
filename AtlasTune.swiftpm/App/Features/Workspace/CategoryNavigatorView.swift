@@ -19,12 +19,6 @@ struct CategoryNavigatorView: View {
                         ForEach(favorites) { tableRow($0) }
                     }
                 }
-                let recents = model.recentTables()
-                if !recents.isEmpty {
-                    Section("Recent") {
-                        ForEach(recents) { tableRow($0) }
-                    }
-                }
                 Section("Maps") {
                     ForEach(model.subcategoryGroups(), id: \.name) { group in
                         folder(group.name, tables: group.tables)
