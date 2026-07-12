@@ -45,7 +45,10 @@ struct InspectorView: View {
         if let table = model.openTable {
             List {
                 Section("Table") {
-                    labeled("Name", table.definition.name)
+                    labeled("Name", model.displayName(table.definition))
+                    if model.translateNames, table.definition.name != model.displayName(table.definition) {
+                        labeled("Original", table.definition.name)
+                    }
                     labeled("Category", table.definition.category.displayName)
                     labeled("Units", table.definition.unit)
                     labeled("Size", "\(table.rows) × \(table.columns)")
@@ -53,6 +56,7 @@ struct InspectorView: View {
                         labeled("Safe Range", "\(range.lowerBound) … \(range.upperBound)")
                     }
                 }
+                aboutSection(table.definition)
                 if !table.definition.description.isEmpty {
                     Section("Description") { Text(table.definition.description) }
                 }
@@ -74,6 +78,32 @@ struct InspectorView: View {
         } else {
             ContentUnavailableView("No Selection", systemImage: "info.circle")
         }
+    }
+
+    /// "About this map": an immediate offline explanation of what the table does, plus a
+    /// user-initiated web search (opens the browser — we link out rather than reproduce third-party
+    /// content in-app).
+    @ViewBuilder private func aboutSection(_ definition: TableDefinition) -> some View {
+        let explanation = MapExplainer().builtinExplanation(for: definition)
+        Section("About this map") {
+            Text(explanation.summary).font(.callout)
+            if let note = explanation.tuningNote {
+                Label(note, systemImage: "wrench.and.screwdriver")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let url = webSearchURL(for: definition) {
+                Link(destination: url) {
+                    Label("Look up online", systemImage: "safari")
+                }
+            }
+        }
+    }
+
+    private func webSearchURL(for definition: TableDefinition) -> URL? {
+        let terms = "\(model.displayName(definition)) BMW S58 MG1CS049 tune map"
+        var components = URLComponents(string: "https://duckduckgo.com/")
+        components?.queryItems = [URLQueryItem(name: "q", value: terms)]
+        return components?.url
     }
 
     private func labeled(_ title: String, _ value: String) -> some View {

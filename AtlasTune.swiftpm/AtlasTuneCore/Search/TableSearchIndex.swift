@@ -5,6 +5,11 @@ public struct TableSearchResult: Sendable, Identifiable, Equatable {
     public let table: TableDefinition
     public let score: Int
     public var id: String { table.id }
+
+    public init(table: TableDefinition, score: Int) {
+        self.table = table
+        self.score = score
+    }
 }
 
 /// A small in-memory index that supports instant search across table name, category,

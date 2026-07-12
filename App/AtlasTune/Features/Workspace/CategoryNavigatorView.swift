@@ -1,9 +1,10 @@
 import SwiftUI
 import AtlasTuneCore
 
-/// The left navigator: instant search plus Favorites and Recent shortcuts above the category-grouped
-/// table list, so the tuner reaches a map in one tap instead of hunting 1370 tables. Tapping a row
-/// opens the map; the star toggles a favorite.
+/// The left navigator: instant search plus Favorites and Recent shortcuts above collapsible
+/// functional folders (Boost, Fuel, Ignition, …), so the tuner reaches a map in one tap instead of
+/// hunting 1370 tables. Tapping a row opens the map; the star (or right-click ▸ Pin) toggles a
+/// favorite. Names are shown in English when translation is on.
 struct CategoryNavigatorView: View {
     @Bindable var model: WorkspaceModel
 
@@ -12,7 +13,7 @@ struct CategoryNavigatorView: View {
             if model.searchQuery.isEmpty {
                 let favorites = model.favoriteTables()
                 if !favorites.isEmpty {
-                    Section("Favorites") {
+                    Section("★ Favorites") {
                         ForEach(favorites) { tableRow($0) }
                     }
                 }
@@ -22,9 +23,9 @@ struct CategoryNavigatorView: View {
                         ForEach(recents) { tableRow($0) }
                     }
                 }
-                ForEach(model.package?.categories ?? [], id: \.self) { category in
-                    Section(category.displayName) {
-                        ForEach(model.tables(in: category)) { tableRow($0) }
+                ForEach(model.subcategoryGroups(), id: \.name) { group in
+                    Section(model.displaySubcategory(group.name)) {
+                        ForEach(group.tables) { tableRow($0) }
                     }
                 }
             } else {
@@ -41,13 +42,9 @@ struct CategoryNavigatorView: View {
     private func tableRow(_ table: TableDefinition) -> some View {
         Label {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(table.name)
-                    if let sub = table.subcategory {
-                        Text(sub).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
+                Text(model.displayName(table))
+                    .lineLimit(2)
+                Spacer(minLength: 4)
                 Button {
                     model.toggleFavorite(table.id)
                 } label: {
@@ -62,5 +59,18 @@ struct CategoryNavigatorView: View {
                 .foregroundStyle(.tint)
         }
         .tag(table.id)
+        .contextMenu {
+            Button {
+                model.toggleFavorite(table.id)
+            } label: {
+                Label(model.isFavorite(table.id) ? "Unpin from Favorites" : "Pin to Favorites",
+                      systemImage: model.isFavorite(table.id) ? "star.slash" : "star")
+            }
+            Button {
+                model.openTable(id: table.id)
+            } label: {
+                Label("Open", systemImage: "arrow.up.right.square")
+            }
+        }
     }
 }
