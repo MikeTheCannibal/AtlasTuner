@@ -73,12 +73,20 @@ struct TableEditorContainer: View {
     @ViewBuilder private var content: some View {
         switch mode {
         case .spreadsheet:
-            SpreadsheetView(table: table, selection: $selection, heatMap: overlayHeatMap)
+            SpreadsheetView(table: table, selection: $selection, heatMap: overlayHeatMap,
+                            zoomBinding: zoomBinding)
         case .graph:
             TableGraphView(table: table)
         case .surface:
             SurfaceContainerView(table: table)
         }
+    }
+
+    /// Zoom routed to the workspace so each map keeps its own level across switches/relaunches.
+    private var zoomBinding: Binding<Double> {
+        let id = table.definition.id
+        return Binding(get: { model.zoom(for: id) },
+                       set: { model.setZoom($0, for: id) })
     }
 
     /// Graph is most useful for 1D, surface for 3D — but all modes stay available.

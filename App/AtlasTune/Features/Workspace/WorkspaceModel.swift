@@ -79,6 +79,7 @@ final class WorkspaceModel {
         project = opened
         state = .ready
         loadFavorites()
+        loadZoom()
         refreshSearch()
     }
 
@@ -97,6 +98,7 @@ final class WorkspaceModel {
         project = opened
         state = .ready
         loadFavorites()
+        loadZoom()
         refreshSearch()
     }
 
@@ -131,6 +133,30 @@ final class WorkspaceModel {
 
     private func loadFavorites() {
         favorites = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
+    }
+
+    // MARK: Per-map zoom (persisted like favorites: per package, survives relaunch)
+
+    /// Spreadsheet zoom per table id. Only non-default zooms are stored.
+    private(set) var zoomByTable: [String: Double] = [:]
+
+    func zoom(for tableID: String) -> Double {
+        zoomByTable[tableID] ?? 1.0
+    }
+
+    func setZoom(_ zoom: Double, for tableID: String) {
+        if abs(zoom - 1.0) < 0.01 {
+            zoomByTable.removeValue(forKey: tableID)      // default: don't store noise
+        } else {
+            zoomByTable[tableID] = zoom
+        }
+        UserDefaults.standard.set(zoomByTable, forKey: zoomKey)
+    }
+
+    private var zoomKey: String { "zoom.\(package?.id ?? "unknown")" }
+
+    private func loadZoom() {
+        zoomByTable = (UserDefaults.standard.dictionary(forKey: zoomKey) as? [String: Double]) ?? [:]
     }
 
     /// Apply an edit to the open table, updating the working image and undo history.
