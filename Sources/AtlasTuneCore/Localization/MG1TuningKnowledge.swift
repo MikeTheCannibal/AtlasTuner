@@ -17,6 +17,8 @@ public struct MG1KnowledgeArticle: Sendable, Equatable, Identifiable {
     public let practice: [String]
     /// The sharp edge, if there is one.
     public let warning: String?
+    /// Channels worth watching in the datalog while tuning this system (canonical S58 set).
+    public let logChannels: [LogChannel]
     /// Source for the full guide.
     public let reference: URL
 
@@ -59,6 +61,7 @@ public enum MG1TuningKnowledge {
                 "Work one limiter at a time: torque limit → clutch torque → load limiters, one datalog per change.",
             ],
             warning: "The torque *monitoring* tables are anti-tuning tripwires (stock ~3276 Nm). Making more power than stock without raising them can drop the car into limp mode.",
+            logChannels: [.torque, .load, .rpm, .boost],
             reference: guideURL,
             keywords: ["torque", "moment", "clutch", "monitoring"],
             fallbackCategories: [.torque]
@@ -81,6 +84,7 @@ public enum MG1TuningKnowledge {
                 "S58/Aurix: datalog the Load Limit and Torque Limit (Flag) RAM channels — they tell you exactly which limiter is active (flag 4 = fuelling/LPFP).",
             ],
             warning: nil,
+            logChannels: [.load, .rpm, .iat, .boost],
             reference: guideURL,
             keywords: ["filling", "füllung", "load limit", "load target", "relative filling"],
             fallbackCategories: []
@@ -105,6 +109,7 @@ public enum MG1TuningKnowledge {
                 "Sport-mode boost offset pre-loads boost for throttle response; on a tuned map it can request more boost than the torque target wants and cause throttle closures — zeroing it fixes that.",
             ],
             warning: "Oversized PID bounds cause over/undershoot, and leaving the PID floor/ceiling stock at large deviations can throw the 120308 pressure-too-low plausibility fault. Excess base duty (especially with a high-flow downpipe) overboosts.",
+            logChannels: [.boost, .wgdc, .rpm, .load],
             reference: guideURL,
             keywords: ["boost", "wgdc", "wastegate", "ladedruck", "pressure ratio", "compressor", "turbine", "pid", "i-factor", "p-gain", "d-gain", "i-gain"],
             fallbackCategories: [.boost]
@@ -129,6 +134,7 @@ public enum MG1TuningKnowledge {
                 "Load capped with limiter flag 4? That's the LPFP/fuelling limit chain — raise its flat load cap, and treat the high-value variants on G8x S58 ROMs with caution.",
             ],
             warning: "Chasing lean numbers on questionable fuel is how knock starts — richen first, verify, then lean back in steps.",
+            logChannels: [.lambda, .fuelTrim, .load, .rpm],
             reference: guideURL,
             keywords: ["lambda", "fuel", "kraftstoff", "afr", "mixture", "scalar", "stft", "injection", "einspritz", "hpfp", "lpfp"],
             fallbackCategories: [.fuel]
@@ -150,6 +156,7 @@ public enum MG1TuningKnowledge {
                 "On ethanol blends, the IAT-based corrections can be relaxed — charge cooling does part of that work.",
             ],
             warning: "Timing is where MG1 hides the consequences of every other shortcut: knock retard showing up here usually means fuel quality or load targets need fixing first.",
+            logChannels: [.ignitionTiming, .knock, .rpm, .load],
             reference: guideURL,
             keywords: ["ignition", "timing", "zünd", "spark", "spool", "knock", "klopf"],
             fallbackCategories: [.ignition]
