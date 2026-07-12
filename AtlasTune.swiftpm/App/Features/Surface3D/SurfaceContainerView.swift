@@ -42,14 +42,39 @@ struct SurfaceContainerView: View {
     }
 
     private var legend: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(table.definition.name).font(.headline)
-            Text("Min \(table.minValue, format: .number) · Max \(table.maxValue, format: .number) \(table.definition.unit)")
-                .font(.caption).foregroundStyle(.secondary)
+            axisKey(color: Color(red: 0.95, green: 0.30, blue: 0.25),
+                    label: axisLabel(table.definition.xAxis, values: table.xAxis, fallback: "Columns"))
+            if !table.yAxis.isEmpty {
+                axisKey(color: Color(red: 0.35, green: 0.55, blue: 0.95),
+                        label: axisLabel(table.definition.yAxis, values: table.yAxis, fallback: "Rows"))
+            }
+            axisKey(color: Color(red: 0.30, green: 0.85, blue: 0.40),
+                    label: "\(table.definition.unit.isEmpty ? "Value" : table.definition.unit)  \(rangeText(table.minValue, table.maxValue))")
         }
         .padding(8)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         .padding(12)
+    }
+
+    /// One legend row: a coloured swatch matching the 3D axis line, plus name/unit and range.
+    private func axisKey(color: Color, label: String) -> some View {
+        HStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 1.5).fill(color).frame(width: 14, height: 3)
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func axisLabel(_ axis: AxisDefinition?, values: [Double], fallback: String) -> String {
+        let name = axis.map { $0.unit.isEmpty ? $0.name : "\($0.name) (\($0.unit))" } ?? fallback
+        guard let first = values.first, let last = values.last else { return name }
+        return "\(name)  \(rangeText(first, last))"
+    }
+
+    private func rangeText(_ a: Double, _ b: Double) -> String {
+        let f: (Double) -> String = { $0.formatted(.number.precision(.fractionLength(0...1))) }
+        return "\(f(a)) → \(f(b))"
     }
 }
 

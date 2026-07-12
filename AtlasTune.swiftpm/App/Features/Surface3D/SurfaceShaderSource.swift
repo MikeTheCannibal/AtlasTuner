@@ -57,5 +57,29 @@ enum SurfaceShaderSource {
         float3 lit = base * (ambient + diffuse * 0.75);
         return float4(lit, 1.0);
     }
+
+    struct LineVertex {
+        float3 position;
+        float3 color;
+    };
+
+    struct LineOut {
+        float4 position [[position]];
+        float3 color;
+    };
+
+    vertex LineOut line_vertex(const device LineVertex *vertices [[buffer(0)]],
+                               constant Uniforms &uniforms [[buffer(1)]],
+                               uint vid [[vertex_id]]) {
+        LineVertex v = vertices[vid];
+        LineOut out;
+        out.position = uniforms.modelViewProjection * float4(v.position, 1.0);
+        out.color = v.color;
+        return out;
+    }
+
+    fragment float4 line_fragment(LineOut in [[stage_in]]) {
+        return float4(in.color, 1.0);
+    }
     """
 }
