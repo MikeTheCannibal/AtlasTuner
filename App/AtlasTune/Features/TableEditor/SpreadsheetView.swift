@@ -9,6 +9,9 @@ struct SpreadsheetView: View {
     let table: CalibrationTable
     @Binding var selection: CellRegion
     var heatMap: [[Double]]?
+    /// Committed pinch zoom, owned by the workspace so it persists per map across map switches
+    /// and relaunches. Falls back to local state when no owner is wired (previews).
+    var zoomBinding: Binding<Double>?
 
     // Base metrics; a drag location still maps deterministically onto a cell because every
     // metric scales by the same zoom factor.
@@ -18,8 +21,15 @@ struct SpreadsheetView: View {
     private static let baseHeaderH: CGFloat = 38
 
     /// Committed pinch zoom (0.4 = whole big table at a glance … 2.5 = large readable cells).
-    @State private var zoom: CGFloat = 1
+    @State private var localZoom: CGFloat = 1
     @GestureState private var pinch: CGFloat = 1
+
+    private var zoom: CGFloat {
+        get { zoomBinding.map { CGFloat($0.wrappedValue) } ?? localZoom }
+        nonmutating set {
+            if let zoomBinding { zoomBinding.wrappedValue = Double(newValue) } else { localZoom = newValue }
+        }
+    }
 
     /// Live zoom = committed zoom × the in-flight pinch, so the grid scales under the fingers.
     private var liveZoom: CGFloat { (zoom * pinch).clampedZoom() }
