@@ -37,7 +37,7 @@ struct TableEditorContainer: View {
             }
             .padding(10)
         }
-        .navigationTitle(table.definition.name)
+        .navigationTitle(model.displayName(table.definition))
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif

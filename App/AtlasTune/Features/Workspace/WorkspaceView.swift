@@ -12,14 +12,18 @@ struct WorkspaceView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             navigator
                 .navigationTitle("Atlas Tune")
-                .navigationSplitViewColumnWidth(min: 260, ideal: 300)
+                .navigationSplitViewColumnWidth(min: 240, ideal: 300, max: 460)
         } content: {
             editor
-                .navigationSplitViewColumnWidth(min: 420, ideal: 720)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationSplitViewColumnWidth(min: 380, ideal: 720)
         } detail: {
             InspectorView(model: model)
-                .navigationSplitViewColumnWidth(min: 280, ideal: 340)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 340, max: 560)
         }
+        // `.balanced` lets the columns share the window and push each other, so opening/closing the
+        // sidebar resizes the editor instead of overlaying it.
+        .navigationSplitViewStyle(.balanced)
         .toolbar { toolbar }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.data]) { result in
             handleImport(result)
@@ -77,6 +81,12 @@ struct WorkspaceView: View {
             Menu {
                 Button("Save Revision…") { _ = model.saveRevision(name: "Revision") }
             } label: { Label("Revisions", systemImage: "clock.arrow.circlepath") }
+            Menu {
+                Toggle(isOn: $model.translateNames) {
+                    Label("Translate names to English", systemImage: "character.book.closed")
+                }
+                .onChange(of: model.translateNames) { _, _ in model.refreshSearch() }
+            } label: { Label("Settings", systemImage: "gearshape") }
         }
     }
 

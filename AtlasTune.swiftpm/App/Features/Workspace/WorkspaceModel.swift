@@ -31,10 +31,37 @@ final class WorkspaceModel {
     private(set) var recents: [String] = []
     private let maxRecents = 8
 
+    /// Translate German Bosch/BMW map names to English for display. Persisted globally.
+    var translateNames: Bool {
+        didSet { UserDefaults.standard.set(translateNames, forKey: "translateNames") }
+    }
+
     let catalog: DefinitionCatalog
+    private let translator = MapNameTranslator()
+    private var translationCache: [String: String] = [:]
 
     init(catalog: DefinitionCatalog = .phase1) {
         self.catalog = catalog
+        self.translateNames = UserDefaults.standard.object(forKey: "translateNames") as? Bool ?? true
+    }
+
+    // MARK: Display names (German → English)
+
+    /// The name to show for a table, honoring the translate-names setting (cached).
+    func displayName(_ definition: TableDefinition) -> String {
+        guard translateNames else { return definition.name }
+        if let cached = translationCache[definition.name] { return cached }
+        let translated = translator.translate(definition.name)
+        translationCache[definition.name] = translated
+        return translated
+    }
+
+    func displaySubcategory(_ raw: String) -> String {
+        guard translateNames else { return raw }
+        if let cached = translationCache[raw] { return cached }
+        let translated = translator.translate(raw)
+        translationCache[raw] = translated
+        return translated
     }
 
     var identity: ROMIdentity? { project?.identity }
@@ -152,11 +179,43 @@ final class WorkspaceModel {
     // MARK: Search
 
     func refreshSearch() {
-        searchResults = project?.search(searchQuery) ?? []
+        guard let package else { searchResults = []; return }
+        let engineHits = project?.search(searchQuery) ?? []
+        guard translateNames, !searchQuery.isEmpty else { searchResults = engineHits; return }
+        // With translation on, also match the English display name so an English query finds a
+        // German-named map. Merge with engine hits, engine hits first, de-duplicated.
+        let q = searchQuery.lowercased()
+        var seen = Set(engineHits.map(\.table.id))
+        var merged = engineHits
+        for table in package.tables where !seen.contains(table.id) && displayName(table).lowercased().contains(q) {
+            merged.append(TableSearchResult(table: table, score: 0))
+            seen.insert(table.id)
+        }
+        searchResults = merged
     }
 
     func tables(in category: CalibrationCategory) -> [TableDefinition] {
         package?.tables(in: category) ?? []
+    }
+
+    /// Functional folders for the navigator, bm3-style: tables grouped by their subcategory,
+    /// with the common tuning areas ordered first and the big catch-alls last.
+    func subcategoryGroups() -> [(name: String, tables: [TableDefinition])] {
+        guard let package else { return [] }
+        var groups: [String: [TableDefinition]] = [:]
+        for table in package.tables {
+            groups[table.subcategory ?? "Other", default: []].append(table)
+        }
+        let priority = ["Boost", "WGDC", "Fuel", "Ignition", "Limits", "Torque request",
+                        "Load", "Throttle", "Vanos", "Cooling", "Idle", "MAF", "Exhaust",
+                        "Rev limits", "Sensor Calibrations", "Oil Pressure"]
+        func rank(_ name: String) -> Int { priority.firstIndex(of: name) ?? priority.count }
+        return groups
+            .map { (name: $0.key, tables: $0.value.sorted { $0.name < $1.name }) }
+            .sorted { lhs, rhs in
+                let (a, b) = (rank(lhs.name), rank(rhs.name))
+                return a != b ? a < b : lhs.name < rhs.name
+            }
     }
 
     func validate() -> ValidationReport? {
