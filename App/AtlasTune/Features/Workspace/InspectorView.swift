@@ -97,6 +97,28 @@ struct InspectorView: View {
                 }
             }
         }
+        if let article = MG1TuningKnowledge.article(for: definition) {
+            mg1Section(article)
+        }
+    }
+
+    /// Curated MG1 systems knowledge for the map's control chain: how it works, ordered practice,
+    /// the sharp edge, and the source guide.
+    @ViewBuilder private func mg1Section(_ article: MG1KnowledgeArticle) -> some View {
+        Section("MG1: \(article.title)") {
+            Text(article.howItWorks).font(.callout)
+            ForEach(Array(article.practice.enumerated()), id: \.offset) { index, step in
+                Label(step, systemImage: "\(index + 1).circle")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let warning = article.warning {
+                Label(warning, systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            Link(destination: article.reference) {
+                Label("Full guide (bootmod3 wiki)", systemImage: "book")
+            }
+        }
     }
 
     private func webSearchURL(for definition: TableDefinition) -> URL? {
