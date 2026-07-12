@@ -237,17 +237,34 @@ struct DatalogView: View {
     }
 
     private var channelGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 8) {
-            ForEach(model.session.channels) { channel in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(channel.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    Text(reading(channel))
-                        .font(.title3.monospacedDigit().bold())
-                    Text(channel.unit).font(.caption2).foregroundStyle(.tertiary)
+        VStack(alignment: .leading, spacing: 6) {
+            if !model.watchedChannelIDs.isEmpty {
+                HStack {
+                    Label("Watching for this map's tuning guidance", systemImage: "eye")
+                        .font(.caption).foregroundStyle(.tint)
+                    Spacer()
+                    Button("Clear") { model.watch([]) }
+                        .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-                .background(Color.secondaryBackground, in: RoundedRectangle(cornerRadius: 10))
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))], spacing: 8) {
+                ForEach(model.displayChannels) { channel in
+                    let watched = model.isWatched(channel)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 3) {
+                            if watched { Image(systemName: "eye.fill").font(.caption2).foregroundStyle(.tint) }
+                            Text(channel.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Text(reading(channel))
+                            .font(.title3.monospacedDigit().bold())
+                        Text(channel.unit).font(.caption2).foregroundStyle(.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(Color.secondaryBackground, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(watched ? Color.accentColor.opacity(0.6) : .clear, lineWidth: 1.5))
+                }
             }
         }
     }

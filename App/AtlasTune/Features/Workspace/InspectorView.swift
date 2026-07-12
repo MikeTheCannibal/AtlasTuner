@@ -115,6 +115,17 @@ struct InspectorView: View {
                 Label(warning, systemImage: "exclamationmark.triangle")
                     .font(.caption).foregroundStyle(.orange)
             }
+            if !article.logChannels.isEmpty {
+                Button {
+                    datalog.watch(article.logChannels)
+                    tab = .datalog
+                } label: {
+                    Label("Watch in Datalog: \(article.logChannels.map(\.name).joined(separator: ", "))",
+                          systemImage: "waveform.path.ecg")
+                        .font(.caption)
+                }
+                .help("Pin these channels to the top of the datalog panel")
+            }
             Link(destination: article.reference) {
                 Label("Full guide (bootmod3 wiki)", systemImage: "book")
             }

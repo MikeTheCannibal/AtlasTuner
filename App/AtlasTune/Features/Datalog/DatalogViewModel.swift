@@ -17,6 +17,10 @@ final class DatalogViewModel {
     private(set) var activeCell: CellAddress?
     private(set) var recentCells: [CellAddress] = []
 
+    /// Channel ids the tuner asked to watch (e.g. from an MG1 guidance article) — the datalog
+    /// panel pins these first and highlights them.
+    private(set) var watchedChannelIDs: [String] = []
+
     /// Latest Atlas AI advisory report for the loaded session against the tracked table.
     private(set) var analysis: AnalysisReport?
     /// Quantified, safety-clamped suggestions applicable to the tracked table. Applying one is
@@ -63,6 +67,24 @@ final class DatalogViewModel {
     /// analysis or the remaining (unapplied) suggestions.
     func refreshTrackedTable(_ table: CalibrationTable) {
         trackedTable = table
+    }
+
+    /// Pin these channels to the top of the datalog panel (called from MG1 guidance's
+    /// "Watch in Datalog"). Replaces the previous watch set; pass `[]` to clear.
+    func watch(_ channels: [LogChannel]) {
+        watchedChannelIDs = channels.map(\.id)
+    }
+
+    func isWatched(_ channel: LogChannel) -> Bool {
+        watchedChannelIDs.contains(channel.id)
+    }
+
+    /// Session channels with the watched ones first (in watch order), the rest in session order.
+    var displayChannels: [LogChannel] {
+        guard !watchedChannelIDs.isEmpty else { return session.channels }
+        let watched = watchedChannelIDs.compactMap { id in session.channels.first { $0.id == id } }
+        let rest = session.channels.filter { !watchedChannelIDs.contains($0.id) }
+        return watched + rest
     }
 
     func start(source: DatalogSource) {

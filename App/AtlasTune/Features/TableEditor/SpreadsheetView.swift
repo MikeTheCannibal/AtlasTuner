@@ -10,11 +10,26 @@ struct SpreadsheetView: View {
     @Binding var selection: CellRegion
     var heatMap: [[Double]]?
 
-    // Fixed metrics so a drag location maps deterministically onto a cell.
-    private let cellW: CGFloat = 66
-    private let cellH: CGFloat = 42
-    private let headerW: CGFloat = 60
-    private let headerH: CGFloat = 38
+    // Base metrics; a drag location still maps deterministically onto a cell because every
+    // metric scales by the same zoom factor.
+    private static let baseCellW: CGFloat = 66
+    private static let baseCellH: CGFloat = 42
+    private static let baseHeaderW: CGFloat = 60
+    private static let baseHeaderH: CGFloat = 38
+
+    /// Committed pinch zoom (0.4 = whole big table at a glance … 2.5 = large readable cells).
+    @State private var zoom: CGFloat = 1
+    @GestureState private var pinch: CGFloat = 1
+
+    /// Live zoom = committed zoom × the in-flight pinch, so the grid scales under the fingers.
+    private var liveZoom: CGFloat { (zoom * pinch).clampedZoom() }
+    private var cellW: CGFloat { Self.baseCellW * liveZoom }
+    private var cellH: CGFloat { Self.baseCellH * liveZoom }
+    private var headerW: CGFloat { Self.baseHeaderW * liveZoom }
+    private var headerH: CGFloat { Self.baseHeaderH * liveZoom }
+    /// Font sizes track the zoom so text stays proportional and crisp (no raster scaling).
+    private var valueFontSize: CGFloat { 14 * liveZoom }
+    private var headerFontSize: CGFloat { 11 * liveZoom }
 
     private var hasColHeader: Bool { !table.xAxis.isEmpty }
     private var hasRowHeader: Bool { !table.yAxis.isEmpty }
@@ -30,6 +45,27 @@ struct SpreadsheetView: View {
                 .coordinateSpace(name: "grid")
                 .gesture(sweep)
                 .padding(8)
+        }
+        .simultaneousGesture(
+            MagnifyGesture()
+                .updating($pinch) { value, state, _ in state = value.magnification }
+                .onEnded { value in zoom = (zoom * value.magnification).clampedZoom() }
+        )
+        .overlay(alignment: .bottomTrailing) { zoomBadge }
+    }
+
+    /// Small transient control: current zoom + reset, so trackpad users aren't stuck.
+    @ViewBuilder private var zoomBadge: some View {
+        if abs(liveZoom - 1) > 0.01 {
+            Button {
+                withAnimation(.snappy) { zoom = 1 }
+            } label: {
+                Label("\(Int((liveZoom * 100).rounded()))%", systemImage: "arrow.counterclockwise")
+                    .font(.caption.monospacedDigit())
+            }
+            .buttonStyle(.bordered)
+            .padding(10)
+            .help("Reset zoom to 100%")
         }
     }
 
@@ -63,7 +99,7 @@ struct SpreadsheetView: View {
         let selected = selection.rows.contains(row) && selection.columns.contains(column)
         let heat = heatMap?[safe: row]?[safe: column] ?? 0
         return Text(value, format: .number.precision(.fractionLength(table.definition.scaling.decimals)))
-            .font(.callout.monospacedDigit().weight(selected ? .semibold : .regular))
+            .font(.system(size: valueFontSize, weight: selected ? .semibold : .regular).monospacedDigit())
             .foregroundStyle(.primary)
             .frame(width: cellW, height: cellH)
             .background(heatColor(value))
@@ -106,7 +142,7 @@ struct SpreadsheetView: View {
     private var cornerHeader: some View {
         Button { selection = CellRegion.all(table) } label: {
             Text(table.definition.xAxis?.unit ?? "")
-                .font(.caption2.bold()).foregroundStyle(.secondary)
+                .font(.system(size: headerFontSize, weight: .bold)).foregroundStyle(.secondary)
                 .frame(width: headerW, height: headerH)
                 .background(Color.secondaryBackground)
         }
@@ -117,7 +153,7 @@ struct SpreadsheetView: View {
     private func columnHeader(_ value: Double, column: Int) -> some View {
         Button { selection = CellRegion(rows: 0..<table.rows, columns: column..<(column + 1)) } label: {
             Text(value, format: .number.precision(.fractionLength(0)))
-                .font(.caption2.monospacedDigit().weight(.semibold))
+                .font(.system(size: headerFontSize, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: cellW, height: headerH)
                 .background(selection.columns.contains(column) ? Color.accentColor.opacity(0.2) : Color.secondaryBackground)
@@ -128,7 +164,7 @@ struct SpreadsheetView: View {
     private func rowHeader(_ value: Double, row: Int) -> some View {
         Button { selection = CellRegion(rows: row..<(row + 1), columns: 0..<table.columns) } label: {
             Text(value, format: .number.precision(.fractionLength(0)))
-                .font(.caption2.monospacedDigit().weight(.semibold))
+                .font(.system(size: headerFontSize, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: headerW, height: cellH)
                 .background(selection.rows.contains(row) ? Color.accentColor.opacity(0.2) : Color.secondaryBackground)
@@ -177,4 +213,9 @@ private extension Array {
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
     }
+}
+
+
+private extension CGFloat {
+    func clampedZoom() -> CGFloat { Swift.max(0.4, Swift.min(2.5, self)) }
 }
