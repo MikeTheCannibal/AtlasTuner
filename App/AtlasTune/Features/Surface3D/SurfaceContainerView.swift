@@ -14,21 +14,27 @@ struct SurfaceContainerView: View {
     @GestureState private var dragTranslation: CGSize = .zero
     @GestureState private var pinchScale: CGFloat = 1
 
+    // The camera the renderer sees = committed state + the in-flight gesture, so orbit/zoom track
+    // the pointer in real time; `.onEnded` then folds the gesture into the committed state.
+    private var liveYaw: Float { yaw + Float(dragTranslation.width) * 0.005 }
+    private var livePitch: Float { (pitch + Float(dragTranslation.height) * 0.005).clampedPitch() }
+    private var liveDistance: Float { (distance / Float(pinchScale)).clampedDistance() }
+
     var body: some View {
-        MetalSurfaceView(table: table, yaw: yaw, pitch: pitch, distance: distance)
+        MetalSurfaceView(table: table, yaw: liveYaw, pitch: livePitch, distance: liveDistance)
             .gesture(
                 DragGesture()
                     .updating($dragTranslation) { value, state, _ in state = value.translation }
                     .onEnded { value in
                         yaw += Float(value.translation.width) * 0.005
-                        pitch = max(-1.4, min(1.4, pitch + Float(value.translation.height) * 0.005))
+                        pitch = (pitch + Float(value.translation.height) * 0.005).clampedPitch()
                     }
             )
             .gesture(
                 MagnifyGesture()
                     .updating($pinchScale) { value, state, _ in state = value.magnification }
                     .onEnded { value in
-                        distance = max(0.8, min(8, distance / Float(value.magnification)))
+                        distance = (distance / Float(value.magnification)).clampedDistance()
                     }
             )
             .overlay(alignment: .bottomLeading) { legend }
@@ -45,6 +51,11 @@ struct SurfaceContainerView: View {
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
         .padding(12)
     }
+}
+
+private extension Float {
+    func clampedPitch() -> Float { Swift.max(-1.4, Swift.min(1.4, self)) }
+    func clampedDistance() -> Float { Swift.max(0.8, Swift.min(8, self)) }
 }
 
 /// Bridges MetalKit into SwiftUI. `UIViewRepresentable` and `NSViewRepresentable` differ only in

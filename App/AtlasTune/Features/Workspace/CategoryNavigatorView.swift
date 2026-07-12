@@ -1,15 +1,17 @@
 import SwiftUI
 import AtlasTuneCore
 
-/// The left navigator: instant search plus Favorites and Recent shortcuts above collapsible
-/// functional folders (Boost, Fuel, Ignition, …), so the tuner reaches a map in one tap instead of
-/// hunting 1370 tables. Tapping a row opens the map; the star (or right-click ▸ Pin) toggles a
-/// favorite. Names are shown in English when translation is on.
+/// The left navigator: instant search, ★ Favorites and Recent pinned on top, then **collapsed
+/// drill-down folders** per functional area (Boost, Fuel, Ignition, …) so the tuner is never
+/// staring at 1370 rows at once — expand only the area being worked. Tapping a row opens the map;
+/// the star (or right-click ▸ Pin) toggles a favorite. Names show in English when translation is on.
 struct CategoryNavigatorView: View {
     @Bindable var model: WorkspaceModel
+    /// Folders the tuner has expanded (session state; all folders start collapsed).
+    @State private var expandedFolders: Set<String> = []
 
     var body: some View {
-        List(selection: Binding(get: { model.openTableID }, set: { if let id = $0 { model.openTable(id: id) } })) {
+        List(selection: selectionBinding) {
             if model.searchQuery.isEmpty {
                 let favorites = model.favoriteTables()
                 if !favorites.isEmpty {
@@ -23,9 +25,9 @@ struct CategoryNavigatorView: View {
                         ForEach(recents) { tableRow($0) }
                     }
                 }
-                ForEach(model.subcategoryGroups(), id: \.name) { group in
-                    Section(model.displaySubcategory(group.name)) {
-                        ForEach(group.tables) { tableRow($0) }
+                Section("Maps") {
+                    ForEach(model.subcategoryGroups(), id: \.name) { group in
+                        folder(group.name, tables: group.tables)
                     }
                 }
             } else {
@@ -37,6 +39,40 @@ struct CategoryNavigatorView: View {
         .listStyle(.sidebar)
         .searchable(text: $model.searchQuery, placement: .sidebar, prompt: "Search maps")
         .onChange(of: model.searchQuery) { _, _ in model.refreshSearch() }
+    }
+
+    /// Defer the open to the next runloop tick: mutating model state synchronously inside the
+    /// selection setter triggers AppKit's reentrant-NSTableView warning on macOS.
+    private var selectionBinding: Binding<String?> {
+        Binding(get: { model.openTableID },
+                set: { id in
+                    guard let id else { return }
+                    Task { @MainActor in model.openTable(id: id) }
+                })
+    }
+
+    /// One collapsible functional folder with a map count, collapsed by default.
+    private func folder(_ name: String, tables: [TableDefinition]) -> some View {
+        DisclosureGroup(isExpanded: expansionBinding(name)) {
+            ForEach(tables) { tableRow($0) }
+        } label: {
+            HStack {
+                Label(model.displaySubcategory(name), systemImage: "folder")
+                Spacer(minLength: 4)
+                Text("\(tables.count)")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6).padding(.vertical, 1)
+                    .background(Color.secondaryBackground, in: Capsule())
+            }
+        }
+    }
+
+    private func expansionBinding(_ name: String) -> Binding<Bool> {
+        Binding(get: { expandedFolders.contains(name) },
+                set: { expanded in
+                    if expanded { expandedFolders.insert(name) } else { expandedFolders.remove(name) }
+                })
     }
 
     private func tableRow(_ table: TableDefinition) -> some View {
