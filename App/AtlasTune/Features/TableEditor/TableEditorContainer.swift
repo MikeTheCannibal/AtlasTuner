@@ -32,15 +32,25 @@ struct TableEditorContainer: View {
             Divider()
             content
             Divider()
-            EditToolbar { operation in
+            EditToolbar(stats: SelectionStats.of(selection, in: table), step: nudgeStep) { operation in
                 model.applyEdit(operation, region: selection)
             }
-            .padding(8)
+            .padding(10)
         }
         .navigationTitle(table.definition.name)
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .onChange(of: model.openTableID) { _, _ in
+            selection = CellRegion(row: 0, column: 0)   // fresh selection per table (also re-bounds it)
+        }
+    }
+
+    /// One step in the least-significant displayed digit (e.g. 0.1 for a 1-decimal table),
+    /// so the ± buttons nudge by a natural increment for this map.
+    private var nudgeStep: Double {
+        let decimals = table.definition.scaling.decimals
+        return decimals <= 0 ? 1 : pow(10, -Double(decimals))
     }
 
     private var header: some View {

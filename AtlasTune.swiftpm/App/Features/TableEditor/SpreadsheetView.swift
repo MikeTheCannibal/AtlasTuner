@@ -1,12 +1,23 @@
 import SwiftUI
 import AtlasTuneCore
 
-/// The traditional tuner spreadsheet: axis headers, value cells coloured by magnitude, and an
-/// optional live heat-map overlay from the active-cell tracker. Cells are tap/drag selectable.
+/// The tuner spreadsheet: axis headers, magnitude-coloured value cells and a live heat-map overlay.
+/// Touch-first selection like the established table editors — tap a cell, **drag to sweep a
+/// rectangle**, tap a column/row header to take the whole column/row, tap the corner for the whole
+/// table. Fixed cell metrics make drag hit-testing exact.
 struct SpreadsheetView: View {
     let table: CalibrationTable
     @Binding var selection: CellRegion
     var heatMap: [[Double]]?
+
+    // Fixed metrics so a drag location maps deterministically onto a cell.
+    private let cellW: CGFloat = 66
+    private let cellH: CGFloat = 42
+    private let headerW: CGFloat = 60
+    private let headerH: CGFloat = 38
+
+    private var hasColHeader: Bool { !table.xAxis.isEmpty }
+    private var hasRowHeader: Bool { !table.yAxis.isEmpty }
 
     private var range: ClosedRange<Double> {
         let lo = table.minValue, hi = table.maxValue
@@ -15,67 +26,151 @@ struct SpreadsheetView: View {
 
     var body: some View {
         ScrollView([.horizontal, .vertical]) {
-            Grid(horizontalSpacing: 1, verticalSpacing: 1) {
-                if !table.xAxis.isEmpty {
-                    GridRow {
-                        corner
-                        ForEach(Array(table.xAxis.enumerated()), id: \.offset) { _, x in
-                            axisHeader(x)
-                        }
-                    }
-                }
-                ForEach(0..<table.rows, id: \.self) { row in
-                    GridRow {
-                        if !table.yAxis.isEmpty, row < table.yAxis.count {
-                            axisHeader(table.yAxis[row])
-                        }
-                        ForEach(0..<table.columns, id: \.self) { column in
-                            cell(row: row, column: column)
-                        }
-                    }
-                }
-            }
-            .padding(8)
+            grid
+                .coordinateSpace(name: "grid")
+                .gesture(sweep)
+                .padding(8)
         }
     }
 
-    private var corner: some View {
-        Text(table.definition.xAxis?.unit ?? "")
-            .font(.caption2).foregroundStyle(.secondary)
-            .frame(minWidth: 56, minHeight: 32)
+    private var grid: some View {
+        VStack(spacing: 0) {
+            if hasColHeader {
+                HStack(spacing: 0) {
+                    if hasRowHeader { cornerHeader }
+                    ForEach(Array(table.xAxis.enumerated()), id: \.offset) { index, x in
+                        columnHeader(x, column: index)
+                    }
+                }
+            }
+            ForEach(0..<table.rows, id: \.self) { row in
+                HStack(spacing: 0) {
+                    if hasRowHeader, row < table.yAxis.count {
+                        rowHeader(table.yAxis[row], row: row)
+                    }
+                    ForEach(0..<table.columns, id: \.self) { column in
+                        cell(row: row, column: column)
+                    }
+                }
+            }
+        }
     }
 
-    private func axisHeader(_ value: Double) -> some View {
-        Text(value, format: .number.precision(.fractionLength(0)))
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(.secondary)
-            .frame(minWidth: 56, minHeight: 32)
-            .background(Color.secondaryBackground)
-    }
+    // MARK: Cells
 
     private func cell(row: Int, column: Int) -> some View {
         let value = table.values[row][column]
         let selected = selection.rows.contains(row) && selection.columns.contains(column)
+        let heat = heatMap?[safe: row]?[safe: column] ?? 0
         return Text(value, format: .number.precision(.fractionLength(table.definition.scaling.decimals)))
-            .font(.callout.monospacedDigit())
-            .frame(minWidth: 56, minHeight: 32)
-            .background(cellBackground(value: value, row: row, column: column))
-            .overlay {
-                if selected {
-                    RoundedRectangle(cornerRadius: 3).strokeBorder(Color.accentColor, lineWidth: 2)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { selection = CellRegion(row: row, column: column) }
+            .font(.callout.monospacedDigit().weight(selected ? .semibold : .regular))
+            .foregroundStyle(.primary)
+            .frame(width: cellW, height: cellH)
+            .background(heatColor(value))
+            .overlay(Color.orange.opacity(heat * 0.55))          // active-cell tracker overlay
+            .overlay { if selected { Color.accentColor.opacity(0.28) } }
+            .overlay { if selected { selectionBorder(row: row, column: column) } }
+            .border(Color.primary.opacity(0.06), width: 0.5)
     }
 
-    private func cellBackground(value: Double, row: Int, column: Int) -> some View {
-        let t = (value - range.lowerBound) / (range.upperBound - range.lowerBound)
-        let base = Color(hue: 0.6 - 0.6 * t, saturation: 0.55, brightness: 0.95) // blue→red
-        let heat = heatMap?[safe: row]?[safe: column] ?? 0
-        return base.opacity(0.35 + 0.4 * t)
-            .overlay(Color.orange.opacity(heat * 0.5))
+    /// Outline only the edges of the selected rectangle so it reads as one block.
+    private func selectionBorder(row: Int, column: Int) -> some View {
+        let r = selection.rows, c = selection.columns
+        return ZStack {
+            if row == r.lowerBound { edge(.top) }
+            if row == r.upperBound - 1 { edge(.bottom) }
+            if column == c.lowerBound { edge(.leading) }
+            if column == c.upperBound - 1 { edge(.trailing) }
+        }
     }
+
+    private func edge(_ side: Edge) -> some View {
+        let w: CGFloat = 2.5
+        return Rectangle().fill(Color.accentColor)
+            .frame(width: side == .leading || side == .trailing ? w : cellW,
+                   height: side == .top || side == .bottom ? w : cellH)
+            .frame(width: cellW, height: cellH, alignment: alignment(for: side))
+    }
+
+    private func alignment(for side: Edge) -> Alignment {
+        switch side {
+        case .top: return .top
+        case .bottom: return .bottom
+        case .leading: return .leading
+        case .trailing: return .trailing
+        }
+    }
+
+    // MARK: Headers (whole column / row / table selection)
+
+    private var cornerHeader: some View {
+        Button { selection = CellRegion.all(table) } label: {
+            Text(table.definition.xAxis?.unit ?? "")
+                .font(.caption2.bold()).foregroundStyle(.secondary)
+                .frame(width: headerW, height: headerH)
+                .background(Color.secondaryBackground)
+        }
+        .buttonStyle(.plain)
+        .help("Select whole table")
+    }
+
+    private func columnHeader(_ value: Double, column: Int) -> some View {
+        Button { selection = CellRegion(rows: 0..<table.rows, columns: column..<(column + 1)) } label: {
+            Text(value, format: .number.precision(.fractionLength(0)))
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: cellW, height: headerH)
+                .background(selection.columns.contains(column) ? Color.accentColor.opacity(0.2) : Color.secondaryBackground)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func rowHeader(_ value: Double, row: Int) -> some View {
+        Button { selection = CellRegion(rows: row..<(row + 1), columns: 0..<table.columns) } label: {
+            Text(value, format: .number.precision(.fractionLength(0)))
+                .font(.caption2.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: headerW, height: cellH)
+                .background(selection.rows.contains(row) ? Color.accentColor.opacity(0.2) : Color.secondaryBackground)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Colour
+
+    /// Classic tuning heat ramp: green (low) → yellow → red (high), so gradients read at a glance.
+    private func heatColor(_ value: Double) -> Color {
+        let t = ((value - range.lowerBound) / (range.upperBound - range.lowerBound)).clamped01()
+        return Color(hue: 0.33 * (1 - t), saturation: 0.66, brightness: 0.92)
+            .opacity(0.30 + 0.35 * t)
+    }
+
+    // MARK: Sweep-to-select
+
+    private var sweep: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("grid"))
+            .onChanged { g in
+                let a = cellAt(g.startLocation)
+                let b = cellAt(g.location)
+                selection = CellRegion(
+                    rows: min(a.row, b.row)..<(max(a.row, b.row) + 1),
+                    columns: min(a.column, b.column)..<(max(a.column, b.column) + 1)
+                ).clamped(to: table)
+            }
+    }
+
+    /// Map a point in the grid coordinate space to a cell index, clamped to the value area.
+    private func cellAt(_ point: CGPoint) -> (row: Int, column: Int) {
+        let x0 = hasRowHeader ? headerW : 0
+        let y0 = hasColHeader ? headerH : 0
+        let column = Int((point.x - CGFloat(x0)) / cellW)
+        let row = Int((point.y - CGFloat(y0)) / cellH)
+        return (min(max(row, 0), table.rows - 1), min(max(column, 0), table.columns - 1))
+    }
+}
+
+private extension Double {
+    func clamped01() -> Double { Swift.min(1, Swift.max(0, self)) }
 }
 
 private extension Array {

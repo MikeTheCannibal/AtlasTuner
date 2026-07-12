@@ -25,6 +25,12 @@ final class WorkspaceModel {
     var searchQuery: String = ""
     private(set) var searchResults: [TableSearchResult] = []
 
+    /// Table IDs the tuner starred, persisted per package so they survive relaunch.
+    private(set) var favorites: Set<String> = []
+    /// Most-recently opened table IDs, newest first (session-only).
+    private(set) var recents: [String] = []
+    private let maxRecents = 8
+
     let catalog: DefinitionCatalog
 
     init(catalog: DefinitionCatalog = .phase1) {
@@ -48,6 +54,8 @@ final class WorkspaceModel {
         guard let opened else { state = .unrecognized; return }
         project = opened
         state = .ready
+        recents = []
+        loadFavorites()
         refreshSearch()
     }
 
@@ -65,6 +73,8 @@ final class WorkspaceModel {
         }
         project = opened
         state = .ready
+        recents = []
+        loadFavorites()
         refreshSearch()
     }
 
@@ -74,6 +84,40 @@ final class WorkspaceModel {
         guard let project else { return }
         openTableID = id
         openTable = try? project.table(id: id)
+        recents.removeAll { $0 == id }
+        recents.insert(id, at: 0)
+        if recents.count > maxRecents { recents.removeLast(recents.count - maxRecents) }
+    }
+
+    // MARK: Favorites
+
+    func isFavorite(_ id: String) -> Bool { favorites.contains(id) }
+
+    func toggleFavorite(_ id: String) {
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        persistFavorites()
+    }
+
+    /// Favorited tables, resolved against the current package (skips ids not in this package).
+    func favoriteTables() -> [TableDefinition] {
+        guard let package else { return [] }
+        return package.tables.filter { favorites.contains($0.id) }
+    }
+
+    /// Recently opened tables, newest first.
+    func recentTables() -> [TableDefinition] {
+        guard let package else { return [] }
+        return recents.compactMap { id in package.tables.first { $0.id == id } }
+    }
+
+    private var favoritesKey: String { "favorites.\(package?.id ?? "unknown")" }
+
+    private func persistFavorites() {
+        UserDefaults.standard.set(Array(favorites), forKey: favoritesKey)
+    }
+
+    private func loadFavorites() {
+        favorites = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
     }
 
     /// Apply an edit to the open table, updating the working image and undo history.
